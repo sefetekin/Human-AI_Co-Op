@@ -30,10 +30,8 @@ The game dynamically adjusts enemy behaviour to remain fair, responsive, and sta
 └── README.md
 ```
 
-## Topic 4 — Game Flow
 
 
-```markdown
 ## 🎯 Game Flow
 
 1. Player starts in `PLAYING`
@@ -43,7 +41,7 @@ The game dynamically adjusts enemy behaviour to remain fair, responsive, and sta
 5. Player enters their name and score is saved
 6. Game enters `GAME_OVER`
 7. Player can restart
-```
+
 
 ## ⚙️ Adaptive Difficulty Overview
 
