@@ -30,15 +30,8 @@ The game dynamically adjusts enemy behaviour to remain fair, responsive, and sta
 └── README.md
 ```
 
-⚠️ **Important:**  
-Make sure the opening and closing triple backticks stay together.  
-If this breaks again, tell me — we’ll switch to a non-fenced format.
-
----
-
 ## Topic 4 — Game Flow
 
-Paste after structure:
 
 ```markdown
 ## 🎯 Game Flow
@@ -50,6 +43,7 @@ Paste after structure:
 5. Player enters their name and score is saved
 6. Game enters `GAME_OVER`
 7. Player can restart
+```
 
 ## ⚙️ Adaptive Difficulty Overview
 
@@ -69,7 +63,6 @@ All difficulty decisions are made **once per second**, never per frame.
 
 Computed once per second:
 avg_distance = mean(distance(enemy_i, player))
-
 
 Measures overall enemy pressure rather than player skill.
 
