@@ -28,7 +28,7 @@ The game dynamically adjusts enemy behaviour to remain fair, responsive, and sta
 ├── scores.json      # Local scores (gitignored)
 ├── models/          # External assets/models (gitignored)
 └── README.md
-
+```
 
 ⚠️ **Important:**  
 Make sure the opening and closing triple backticks stay together.  
