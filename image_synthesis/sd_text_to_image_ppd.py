@@ -15,6 +15,46 @@ from peft import LoraConfig, inject_adapter_in_model
 import torch
 from diffsynth.models.utils import load_state_dict
 import argparse
+from pathlib import Path
+
+
+CKPT_PATH = Path("models/ppd/sd1.5-epoch=10-step=720000.ckpt")
+EMA_ONLY_PATH = Path("models/ppd/sd1.5-ema-only.pt")
+
+
+
+def load_or_create_ema_state_dict(
+    ckpt_path: Path,
+    ema_only_path: Path,
+):
+    if ema_only_path.exists():
+        print(f"Loading cached EMA-only weights: {ema_only_path}", flush=True)
+        return torch.load(
+            ema_only_path,
+            map_location="cpu",
+            weights_only=True
+        )
+
+    print("EMA-only weights not found.", flush=True)
+    print("Loading full checkpoint (one-time, may take several minutes)...", flush=True)
+
+    checkpoint = torch.load(
+        ckpt_path,
+        map_location="cpu",
+        weights_only=False
+    )
+
+    if "ema_state_dict" not in checkpoint:
+        raise RuntimeError("EMA state dict not found in checkpoint")
+
+    ema_state_dict = checkpoint["ema_state_dict"]
+
+    ema_only_path.parent.mkdir(parents=True, exist_ok=True)
+    torch.save(ema_state_dict, ema_only_path)
+
+    print(f"Saved EMA-only weights to: {ema_only_path}", flush=True)
+
+    return ema_state_dict
 
 
 def load_trained_model_from_checkpoint(checkpoint_path, pipe, use_ema=True, strict_loading=True):
@@ -23,19 +63,12 @@ def load_trained_model_from_checkpoint(checkpoint_path, pipe, use_ema=True, stri
         return pipe
     
     # Load the checkpoint
-    print(f"Loading checkpoint from: {checkpoint_path}")
-    checkpoint = torch.load(checkpoint_path, map_location="cpu")
-    
-    # Load weights based on use_ema parameter
-    if use_ema and 'ema_state_dict' in checkpoint:
-        print("Loading EMA weights from checkpoint...")
-        trained_state_dict = checkpoint['ema_state_dict']
-        print(f"Found {len(trained_state_dict)} EMA parameters in checkpoint")
-    elif use_ema and 'ema_state_dict' not in checkpoint:
-        raise ValueError("EMA weights requested but not found in checkpoint")
-    else:
-        print("Loading regular trained parameters from checkpoint...")
-        print(f"Found {len(trained_state_dict)} regular parameters in checkpoint")
+    trained_state_dict = load_or_create_ema_state_dict(
+        ckpt_path=Path(checkpoint_path),
+        ema_only_path=EMA_ONLY_PATH
+    )
+
+
     
     # Load the trained parameters into the UNet
     unet = pipe.unet
@@ -82,10 +115,8 @@ def load_trained_model_from_checkpoint(checkpoint_path, pipe, use_ema=True, stri
             if unexpected_keys:
                 print(f"Unexpected keys (ignored): {len(unexpected_keys)}")
         
-        if use_ema and 'ema_state_dict' in checkpoint:
-            print("Successfully loaded EMA weights into UNet")
-        else:
-            print("Successfully loaded regular trained parameters into UNet")
+        print("Successfully loaded EMA-trained parameters into UNet")
+
             
         # Final validation - check if any critical parameters are missing
         if missing_keys:
@@ -213,7 +244,18 @@ if __name__ == "__main__":
 
     # First load the base model
     print(f"Loading base model from: {base_model_path}")
-    model_manager = ModelManager(torch_dtype=torch.bfloat16, device="cuda")
+    if torch.cuda.is_available():
+        device = "cuda"
+        torch_dtype = torch.float16
+    elif torch.backends.mps.is_available():
+        device = "mps"
+        torch_dtype = torch.float32
+    else:
+        device = "cpu"
+        torch_dtype = torch.float32
+
+    print(f"Using device={device}, dtype={torch_dtype}")
+    model_manager = ModelManager(torch_dtype=torch_dtype, device=device)
     model_manager.load_models([base_model_path])
     assert (args.checkpoint_path is not None) ^ (args.lora_checkpoint_path is not None), "Either checkpoint or lora checkpoint must be provided, but not both"
 
