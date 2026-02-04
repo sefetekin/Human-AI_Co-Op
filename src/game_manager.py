@@ -1,16 +1,22 @@
-from enum import Enum
+from enum import Enum, auto
+import time
 from typing import List
+from pathlib import Path
 from pygame.math import Vector2
 from enemy import Enemy
 from character import Character
 import random
 import math
-
+import threading
+from assets import create_asset
+from comment_manager import CommentaryManager
 
 class GameState(Enum):
-    PLAYING = 1
-    AWAITING_NAME = 2
-    GAME_OVER = 3
+    PLAYER_SETUP = auto()
+    LOADING = auto()
+    PLAYING = auto()
+    GAME_OVER = auto()
+    SCOREBOARD = auto()
 
 
 
@@ -25,7 +31,8 @@ class GameManager:
         enemy_speed_range: tuple[float, float],
     ):
         # ---------- game state ----------
-        self.state = GameState.PLAYING
+        self.state = GameState.PLAYER_SETUP
+        self.prev_state = None
 
         # ---------- lives ----------
         self.initial_lives = initial_lives
@@ -34,7 +41,7 @@ class GameManager:
         # ---------- timing ----------
         self.elapsed_time = 0.0
         self.second_timer = 0.0
-        self.spawn_timer = 0.0
+        self.spawn_timer = 4.0
 
         # ---------- spawning ----------
         self.spawn_interval = spawn_interval
@@ -42,9 +49,21 @@ class GameManager:
         self.min_spawn_dist = min_spawn_dist
         self.max_spawn_dist = max_spawn_dist
 
+
+        # ---------- enemy speed ----------
+        self.enemy_speed_range = enemy_speed_range
+        self.min_enemy_speed_limit = 30.0
+        self.max_enemy_speed_limit = 300.0
+        
+        
         # defaults
         self.default_spawn_interval = spawn_interval
         self.default_spawn_count = spawn_count
+        self.default_enemy_speed_range = enemy_speed_range
+        self.default_min_spawn_dist = min_spawn_dist
+        self.default_max_spawn_dist = max_spawn_dist
+        self.default_min_enemy_speed = self.min_enemy_speed_limit
+        self.default_max_enemy_speed = self.max_enemy_speed_limit
 
         # bounds
         self.min_spawn_count = 3
@@ -52,10 +71,7 @@ class GameManager:
         self.min_spawn_interval = 3.0
         self.max_spawn_interval = 15.0
 
-        # ---------- enemy speed ----------
-        self.enemy_speed_range = enemy_speed_range
-        self.min_enemy_speed_limit = 30.0
-        self.max_enemy_speed_limit = 300.0
+        
 
         # ---------- metrics ----------
         self.last_avg_enemy_distance = 0.0
@@ -63,6 +79,9 @@ class GameManager:
         self.avg_distance_history: List[float] = []
         self.max_history_len = 5
         self.kill_count = 0
+        self.enemy_count_delta = 0
+        self.last_avg_enemy_distance = 0.0
+
 
 
         # ---------- spawn tracking ----------
@@ -72,6 +91,14 @@ class GameManager:
 
         # ---------- reference ----------
         self.shield_radius = None
+        
+        # ---------- pre-game ----------
+        self.player_profile = None
+        self.loading_done = False
+
+        self.commentator = None
+
+
 
     # =========================================================
     # Public API
@@ -79,14 +106,22 @@ class GameManager:
 
     def reset(self):
         self.state = GameState.PLAYING
+        if self.commentator and self.player_profile["captions"] == "Caption ON":
+            self.commentator.enabled = True
         self.lives = self.initial_lives
 
         self.elapsed_time = 0.0
         self.second_timer = 0.0
-        self.spawn_timer = 0.0
+        self.spawn_timer = 4.0
 
         self.spawn_interval = self.default_spawn_interval
         self.spawn_count = self.default_spawn_count
+        self.enemy_speed_range = self.default_enemy_speed_range
+        self.min_spawn_dist = self.default_min_spawn_dist 
+        self.max_spawn_dist = self.default_max_spawn_dist
+        self.min_enemy_speed_limit = self.default_min_enemy_speed
+        self.max_enemy_speed_limit = self.default_max_enemy_speed
+
 
         self.last_avg_enemy_distance = 0.0
         self.prev_avg_enemy_distance = None
@@ -98,21 +133,34 @@ class GameManager:
         self.kill_count = 0
 
 
-    def tick(self, dt: float, player: Character, enemies: List[Enemy]):
+    def tick(self, dt: float, player: Character, enemies: List[Enemy], current_terrain: str):
+        # ---------- LOADING ----------
+        if self.state == GameState.LOADING:
+            if self.loading_done:
+                self.loading_done = False
+                self.state = GameState.PLAYING
+                if self.commentator and self.player_profile["captions"] == "Caption ON":
+                    self.commentator.enabled = True
+                self.reset()
+            return
+        
+        # ---------- PLAYING ----------
         if self.state != GameState.PLAYING:
             return
 
         self.elapsed_time += dt
-
-        self._second_tick(dt, player, enemies)
+        
+        self._second_tick(dt, player, enemies, current_terrain)
         self._spawn_tick(dt, player, enemies)
         self._death_check(player, enemies)
+    
+
 
     # =========================================================
     # Per-second logic
     # =========================================================
 
-    def _second_tick(self, dt: float, player: Character, enemies: List[Enemy]):
+    def _second_tick(self, dt: float, player: Character, enemies: List[Enemy], current_terrain: str):
         self.second_timer += dt
         if self.second_timer < 1.0:
             return
@@ -121,9 +169,17 @@ class GameManager:
 
         if self.shield_radius is None:
             self.shield_radius = player.shield_radius
-
+    
         self._sample_avg_enemy_distance(player, enemies)
+    
         self._adjust_enemy_speed_from_distance()
+        self.commentator.update({
+            "avg_enemy_distance": self.last_avg_enemy_distance,
+            "enemy_speed": self.max_enemy_speed_limit,
+            "spawn_count": self.spawn_count,
+            "current_terrain": current_terrain,
+            "lives_left": self.lives,
+        })
 
     def _sample_avg_enemy_distance(self, player: Character, enemies: List[Enemy]):
         if not enemies:
@@ -248,6 +304,15 @@ class GameManager:
                 enemies.remove(e)
                 if self.lives <= 0:
                     self.state = GameState.GAME_OVER
+                    if self.commentator and self.player_profile["captions"] == "Caption ON":
+                        self.commentator.enabled = False
+                        self.commentator.current_line = ""
+                        self.commentator.expire_time = 0
+                self.commentator.trigger_event(
+                    "LOST_LIFE",
+                    {"lives_left": self.lives}
+                )
+
                 return
 
     def _spawn_enemy(self, player_pos: Vector2) -> Enemy:
@@ -261,3 +326,109 @@ class GameManager:
 
         speed = random.uniform(*self.enemy_speed_range)
         return Enemy(pos, speed=speed)
+    
+    def start_loading(self):
+        if getattr(self, "loading_thread", None) and self.loading_thread.is_alive():
+            return  # already loading
+
+        self.state = GameState.LOADING
+        self.loading_done = False
+        self.clear_folder("../outputs")
+
+        self.loading_thread = threading.Thread(
+            target=self._run_loading_script,
+            daemon=True,
+        )
+        self.loading_thread.start()
+
+
+    def _run_loading_script(self):
+        try:
+            self._run_loading_script_forest()
+            self._run_loading_script_desert()
+            self._run_loading_script_rocks()
+        finally:
+            self.loading_done = True
+
+
+    def _run_loading_script_forest(self):
+        # simulate some loading / preprocessing work
+        create_asset(
+            template_path=Path("templates/plain_grass.png"), 
+            prompt_override="a 2D Pixel Art game asset representing grassy ground of a forest texture from bird's eye view", 
+            output_path=Path("outputs/plain_forest.jpg"), 
+            radius=10
+            )
+        
+        create_asset(
+            template_path=Path("templates/dirt_with_stones.png"), 
+            prompt_override="a 2D Pixel Art game asset representing grassy ground of a forest texture from bird's eye view", 
+            output_path=Path("outputs/forest_small.jpg"), 
+            radius=10
+            )
+        
+        create_asset(
+            template_path=Path("templates/dirt_with_rocks.png"), 
+            prompt_override="a 2D Pixel Art game asset representing grassy ground of a forest texture from bird's eye view", 
+            output_path=Path("outputs/forest_big.jpg"), 
+            radius=10
+            )
+
+    def _run_loading_script_desert(self):
+        # simulate some loading / preprocessing work
+        create_asset(
+            template_path=Path("templates/plain_grass.png"), 
+            prompt_override="a 2D Pixel Art game asset representing sand with hills and Tumbleweed texture from bird's eye view", 
+            output_path=Path("outputs/desert_plain.jpg"), 
+            radius=10
+            )
+        
+        create_asset(
+            template_path=Path("templates/dirt_with_stones.png"), 
+            prompt_override="a 2D Pixel Art game asset representing sand with hills and Tumbleweed texture from bird's eye view", 
+            output_path=Path("outputs/desert_small.jpg"), 
+            radius=10
+            )
+        
+        create_asset(
+            template_path=Path("templates/dirt_with_rocks.png"), 
+            prompt_override="a 2D Pixel Art game asset representing sand with hills and Tumbleweed texture from bird's eye view", 
+            output_path=Path("outputs/desert_big.jpg"), 
+            radius=10
+            )
+    
+    def _run_loading_script_rocks(self):
+        # simulate some loading / preprocessing work
+        create_asset(
+            template_path=Path("templates/plain_grass.png"), 
+            prompt_override="a 2D Pixel Art game asset representing rocky terrain of a mountain texture from bird's eye view", 
+            output_path=Path("outputs/rock_plain.jpg"), 
+            radius=10
+            )
+        create_asset(
+            template_path=Path("templates/dirt_with_stones.png"), 
+            prompt_override="a 2D Pixel Art game asset representing rocky terrain of a mountain texture from bird's eye view", 
+            output_path=Path("outputs/rock_small.jpg"), 
+            radius=10
+            )
+        create_asset(
+            template_path=Path("templates/dirt_with_rocks.png"), 
+            prompt_override="a 2D Pixel Art game asset representing rocky terrain of a mountain texture from bird's eye view", 
+            output_path=Path("outputs/rock_big.jpg"), 
+            radius=10
+            )
+    
+    def clear_folder(self, path: str):
+        from pathlib import Path
+        import shutil
+
+        folder = Path(path).resolve()
+
+        if not folder.is_dir():
+            raise ValueError("Path must be an existing directory")
+
+        if len(folder.parts) <= 2:
+            raise ValueError("Refusing to clear unsafe directory")
+
+        shutil.rmtree(folder)
+        folder.mkdir()

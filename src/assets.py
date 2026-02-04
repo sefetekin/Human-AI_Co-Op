@@ -100,35 +100,6 @@ def create_asset(
     return output_path
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Create game assets from templates.")
-    parser.add_argument("--list-templates", action="store_true", help="List available template files.")
-    parser.add_argument("--template", type=str, help="Template filename inside templates/ to use.")
-    parser.add_argument("--prompt", type=str, help="Override prompt text.")
-    parser.add_argument("--radius", type=int, default=1, help="Radius parameter passed to synthesis script.")
-    parser.add_argument("--output", type=str, help="Output filename (optional).")
-    args = parser.parse_args()
-
-    if args.list_templates:
-        for t in list_templates():
-            print(t)
-        return
-
-    if not args.template:
-        parser.error("Missing --template (use --list-templates to see available).")
-
-    template_path = TEMPLATES_DIR / args.template
-    output_path = Path(args.output) if args.output else None
-    try:
-        out = create_asset(template_path, prompt_override=args.prompt, radius=args.radius, output_path=output_path)
-        print(f"Created asset: {out}")
-    except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()
 
 
 def get_template_path(template_name: str) -> Path:
@@ -182,6 +153,36 @@ def create_assets_for_all(
         outputs.append(Path(created))
     return outputs
 
+def generate_commentary_with_gpt4all(traits, event, context) -> str:
+    from gpt4all import GPT4All
+
+    model = GPT4All("Meta-Llama-3-8B-Instruct.Q4_0.gguf")
+
+    system = (
+        "You are an in-game commentator.\n"
+        "Speak in short, natural sentences.\n"
+        "Do not narrate continuously.\n"
+        "Do not explain mechanics.\n"
+        "Never mention exact numbers unless critical.\n"
+        "Tone subtly reflects the player's mood.\n"
+        "Output ONE short sentence only."
+    )
+
+    if event == "AMBIENT":
+        instruction = "Make a light observational comment."
+    else:
+        instruction = f"React immediately to the event: {event}"
+
+    user = (
+        f"Player traits: {traits}\n"
+        f"Context: {context}\n"
+        f"{instruction}"
+    )
+
+    prompt = system + "\n\n" + user
+
+    with model.chat_session():
+        return model.generate(prompt, max_tokens=40).strip()
 
 
 __all__ = [
@@ -190,5 +191,6 @@ __all__ = [
     "generate_prompt",
     "create_asset",
     "create_assets_for_all",
-]
+    "generate_commentary_with_gpt4all"
+    ]
 

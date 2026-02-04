@@ -1,4 +1,7 @@
 import random
+import os
+from collections import defaultdict
+
 import pygame
 from pygame.math import Vector2
 
@@ -6,17 +9,42 @@ from world_objects import WorldObjectManager, CHUNK_SIZE
 from asset_loader import load_images_from_folder
 
 
+# ==================================================
+# Biome configuration
+# ==================================================
+
+BIOME_SIZE = 2  # number of chunks per biome region (2–4 recommended)
+
+
+# ==================================================
+# World Renderer
+# ==================================================
+
 class WorldRenderer:
-    def __init__(self):
+    def __init__(self, content_generation: bool = True):
         # --------------------------------------------------
-        # Load background tiles (biomes)
+        # Load background tiles (grouped by terrain name)
         # --------------------------------------------------
-        self.bg_tiles = load_images_from_folder(
-            "assets/backgrounds",
+        bg_folder = "outputs" if content_generation else "assets/backgrounds"
+
+        self.terrain_tiles = defaultdict(list)
+
+        images_with_paths = load_images_from_folder(
+            bg_folder,
             alpha=False,
+            return_paths=True,
         )
 
-        self.tile_size = self.bg_tiles[0].get_width()
+        for img, path in images_with_paths:
+            filename = os.path.basename(path)
+            terrain = filename.split("_")[0]  # grass_01.png → grass
+            self.terrain_tiles[terrain].append(img)
+
+        if not self.terrain_tiles:
+            raise RuntimeError("No background tiles found!")
+
+        self.terrain_names = list(self.terrain_tiles.keys())
+        self.tile_size = next(iter(self.terrain_tiles.values()))[0].get_width()
 
         # --------------------------------------------------
         # Load props
@@ -39,8 +67,13 @@ class WorldRenderer:
         self._draw_enemies(screen, player, enemies)
         self._draw_player(screen, player)
 
+    def get_terrain_at_world_pos(self, world_pos: Vector2) -> str:
+        cx = int(world_pos.x // CHUNK_SIZE)
+        cy = int(world_pos.y // CHUNK_SIZE)
+        return self._get_terrain_for_chunk(cx, cy)
+
     # ==================================================
-    # Background (chunk-based biome tiling)
+    # Background (biome-based chunk tiling)
     # ==================================================
 
     def _draw_background(self, screen, player):
@@ -59,11 +92,32 @@ class WorldRenderer:
                 tile = self._get_tile_for_chunk(cx, cy)
                 self._draw_chunk(screen, player, cx, cy, tile)
 
-    def _get_tile_for_chunk(self, cx, cy):
-        seed = cx * 73856093 ^ cy * 19349663
-        random.seed(seed)
-        return random.choice(self.bg_tiles)
+    # --------------------------------------------------
+    # Biome logic
+    # --------------------------------------------------
 
+    def _chunk_to_biome(self, cx, cy):
+        return cx // BIOME_SIZE, cy // BIOME_SIZE
+
+    def _get_terrain_for_chunk(self, cx, cy):
+        bx, by = self._chunk_to_biome(cx, cy)
+
+        seed = bx * 73856093 ^ by * 19349663
+        rng = random.Random(seed)
+
+        return rng.choice(self.terrain_names)
+
+    def _get_tile_for_chunk(self, cx, cy):
+        terrain = self._get_terrain_for_chunk(cx, cy)
+
+        seed = cx * 73856093 ^ cy * 19349663 + 999
+        rng = random.Random(seed)
+
+        return rng.choice(self.terrain_tiles[terrain])
+
+    # --------------------------------------------------
+    # Drawing helpers
+    # --------------------------------------------------
 
     def _draw_chunk(self, screen, player, cx, cy, tile):
         origin = Vector2(cx * CHUNK_SIZE, cy * CHUNK_SIZE)

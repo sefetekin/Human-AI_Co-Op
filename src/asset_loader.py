@@ -2,7 +2,11 @@ from pathlib import Path
 import pygame
 
 
-def load_images_from_folder(folder: str, alpha: bool):
+def load_images_from_folder(
+    folder: str,
+    alpha: bool,
+    return_paths: bool = False,
+):
     images = []
     path = Path(folder)
 
@@ -13,7 +17,11 @@ def load_images_from_folder(folder: str, alpha: bool):
         if file.suffix.lower() in (".png", ".jpg", ".jpeg"):
             img = pygame.image.load(file)
             img = img.convert_alpha() if alpha else img.convert()
-            images.append(img)
+
+            if return_paths:
+                images.append((img, str(file)))
+            else:
+                images.append(img)
 
     if not images:
         raise RuntimeError(f"No images found in {folder}")

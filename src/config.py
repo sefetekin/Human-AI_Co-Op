@@ -8,7 +8,7 @@ class GameConfig:
     player_radius: int = 12
 
     # --- shields ---
-    shield_segments: int = 5
+    shield_segments: int = 3
     shield_radius: float = 100.0
     shield_orbit_speed: float = 120.0
     shield_orbit_ball_radius: float = 10.0

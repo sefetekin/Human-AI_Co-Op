@@ -1,5 +1,6 @@
 import pygame
 from game_manager import GameState
+from ui.select_buttons import SelectButtons
 
 
 class HUDRenderer:
@@ -10,27 +11,137 @@ class HUDRenderer:
 
         self.button_w = 160
         self.button_h = 48
+        cx = self.screen_w // 2
+        y = self.screen_h // 2 + 40
+        
+        self.scoreboard_button = SelectButtons(
+            [("Scoreboard", (self.screen_w - self.button_w - 20,  # top-right X
+                20,                                   # top-right Y
+                self.button_w,
+                self.button_h,))]
+        )
+
+        self.game_over_buttons = SelectButtons([
+            ("Restart", (cx - 240, y, 140, 44)),
+            ("New Player", (cx - 70, y, 140, 44)),
+            ("Scoreboard", (cx + 100, y, 140, 44)),
+        ])
 
     # =========================================================
     # Public
     # =========================================================
 
-    def draw(self, screen, game_manager, final_time, player, scoreboard, name_input):
-        # lives should always be visible
-        self._draw_lives(screen, game_manager)
-
-        self._draw_time(screen, game_manager, final_time)
-
-        if game_manager.state == GameState.AWAITING_NAME:
-            self._draw_game_over(screen)
-            self._draw_name_input(screen, name_input)
+    def draw(self, screen, game_manager, final_time, player):
+        
+        if game_manager.state in (GameState.PLAYER_SETUP, GameState.LOADING):
             return
+
+        self._draw_lives(screen, game_manager)
+        self._draw_time(screen, game_manager, final_time)
 
         if game_manager.state == GameState.GAME_OVER:
             self._draw_game_over(screen)
-            self._draw_scoreboard(screen, scoreboard.get_scores())
+            self.game_over_buttons.draw(screen, self.font_small)
+
+
 
         self._draw_debug_panel(screen, game_manager, player)
+        self.draw_commentary(
+            screen,
+            game_manager.commentator.get_line()
+        )
+
+
+    # =========================================================
+    # PLAYER SETUP (DRAW ONLY)
+    # =========================================================
+    def draw_player_setup(self, screen, setup_ui):
+        screen.fill((20, 20, 20))
+        
+        
+        # ---------- Content generation toggle ----------
+        label = self.font_small.render("Content Generation", True, (200, 200, 200))
+        screen.blit(label, (20, 0))
+
+        setup_ui.content_gen_buttons.draw(screen, self.font_small)
+
+        label = self.font_small.render("Captions", True, (200, 200, 200))
+        screen.blit(label, (20, 60))
+
+        setup_ui.caption_buttons.draw(screen, self.font_small)
+
+        # ---------- Title ----------
+        title = self.font_large.render("Player Setup", True, (220, 220, 220))
+        screen.blit(title, (self.screen_w // 2 - title.get_width() // 2, 60))
+
+        # ---------- Labels ----------
+        def draw_label(text, y):
+            surf = self.font_small.render(text, True, (200, 200, 200))
+            screen.blit(surf, (setup_ui.name_input.rect.x, y))
+
+        draw_label("Name (optional)", setup_ui.name_label_y)
+        draw_label("Age Group *",     setup_ui.age_label_y)
+        draw_label("Mood *",          setup_ui.mood_label_y)
+        draw_label("Likes",           setup_ui.likes_label_y)
+
+        # ---------- Widgets ----------
+        setup_ui.name_input.draw(screen, self.font_small)
+        setup_ui.age_group_buttons.draw(screen, self.font_small)
+        setup_ui.mood_buttons.draw(screen, self.font_small)
+        setup_ui.likes_input.draw(screen, self.font_small)
+
+        # ---------- Start ----------
+        self._draw_start_button(
+            screen,
+            setup_ui.start_rect,
+            enabled=setup_ui.is_valid(),
+        )
+
+        # ---------- Scoreboard button ----------
+        self.scoreboard_button.draw(screen, self.font_small)
+        
+        # ---------- Hint ----------
+        hint = self.font_small.render(
+            "Click a field to type. Select an age group and mood.",
+            True,
+            (160, 160, 160),
+        )
+        screen.blit(
+            hint,
+            (self.screen_w // 2 - hint.get_width() // 2, self.screen_h - 40),
+        )
+
+    
+    def _label(self, screen, text, y):
+        surf = self.font_small.render(text, True, (200, 200, 200))
+        screen.blit(surf, (self.screen_w // 2 - 140, y))
+
+    def _draw_start_button(self, screen, rect, enabled: bool):
+        if enabled:
+            fill = (100, 200, 100)
+            txtc = (20, 20, 20)
+        else:
+            fill = (70, 70, 70)
+            txtc = (140, 140, 140)
+
+        pygame.draw.rect(screen, fill, rect, border_radius=8)
+        pygame.draw.rect(screen, (220, 220, 220), rect, 2, border_radius=8)
+
+        txt = self.font_small.render("Start Game", True, txtc)
+        screen.blit(txt, (rect.centerx - txt.get_width() // 2, rect.centery - txt.get_height() // 2))
+
+    # =========================================================
+    # LOADING (DRAW ONLY)
+    # =========================================================
+
+    def draw_loading(self, screen):
+        screen.fill((15, 15, 15))
+        txt = self.font_large.render("Loading...", True, (220, 220, 220))
+        screen.blit(
+            txt,
+            (self.screen_w // 2 - txt.get_width() // 2,
+             self.screen_h // 2 - txt.get_height() // 2),
+        )
 
     # =========================================================
     # Core HUD
@@ -46,7 +157,7 @@ class HUDRenderer:
         screen.blit(txt, (self.screen_w - 80, 10))
 
     # =========================================================
-    # Lives (FIXED)
+    # Lives
     # =========================================================
 
     def _draw_lives(self, screen, game_manager):
@@ -118,83 +229,11 @@ class HUDRenderer:
             ),
         )
 
-        self._draw_restart_button(screen)
-
-    def _draw_restart_button(self, screen):
-        bx = self.screen_w // 2 - self.button_w // 2
-        by = self.screen_h // 2 + 40
-
-        pygame.draw.rect(
-            screen,
-            (200, 200, 200),
-            pygame.Rect(bx, by, self.button_w, self.button_h),
-            border_radius=6,
-        )
-
-        txt = self.font_small.render("Restart", True, (20, 20, 20))
-        screen.blit(
-            txt,
-            (
-                bx + self.button_w // 2 - txt.get_width() // 2,
-                by + self.button_h // 2 - txt.get_height() // 2,
-            ),
-        )
+        # restart button is drawn by your existing logic elsewhere (same rect as before)
+        # (main.py handles click)
 
     # =========================================================
-    # Name input (FIXED POSITION)
-    # =========================================================
-
-    def _draw_name_input(self, screen, name_text):
-        x = self.screen_w // 2
-        y = self.screen_h // 2 - 40   # ⬅ moved UP
-
-        prompt = self.font_small.render(
-            "Enter your name:", True, (220, 220, 220)
-        )
-        screen.blit(prompt, (x - prompt.get_width() // 2, y))
-
-        box_w, box_h = 240, 36
-        bx = x - box_w // 2
-        by = y + 30
-
-        pygame.draw.rect(
-            screen, (255, 255, 255), (bx, by, box_w, box_h), 2
-        )
-
-        name_surf = self.font_small.render(name_text, True, (255, 255, 255))
-        screen.blit(
-            name_surf,
-            (bx + 10, by + box_h // 2 - name_surf.get_height() // 2),
-        )
-
-    # =========================================================
-    # Scoreboard
-    # =========================================================
-
-    def _draw_scoreboard(self, screen, scores):
-        x = self.screen_w // 2
-        y = self.screen_h // 2 + 110
-        line_h = 20
-
-        title = self.font_small.render("Top Runs", True, (220, 220, 220))
-        screen.blit(title, (x - title.get_width() // 2, y))
-
-        for i, entry in enumerate(scores):
-            mins = int(entry["time"] // 60)
-            secs = int(entry["time"] % 60)
-            txt = self.font_small.render(
-                f"{i+1}. {entry['name']} — {mins:02d}:{secs:02d}  |  Kills: {entry['kills']}"
-,
-                True,
-                (200, 200, 200),
-            )
-            screen.blit(
-                txt,
-                (x - txt.get_width() // 2, y + 22 + i * line_h),
-            )
-
-    # =========================================================
-    # Debug panel
+    # Debug panel (UNCHANGED)
     # =========================================================
 
     def _draw_debug_panel(self, screen, game_manager, player):
@@ -229,3 +268,54 @@ class HUDRenderer:
         for i, (label, value, color) in enumerate(lines):
             surf = self.font_small.render(f"{label}: {value}", True, color)
             screen.blit(surf, (x, y + i * line_h))
+            
+    def handle_event(self, event, game_manager):
+        if game_manager.state == GameState.GAME_OVER:
+            self.game_over_buttons.handle_event(event)
+
+        if game_manager.state == GameState.PLAYER_SETUP:
+            self.scoreboard_button.handle_event(event)
+
+            
+    def draw_game_over_preview(self, screen, scoreboard, current_entry):
+        entries, idx = scoreboard.get_preview_for_entry(current_entry)
+
+        x = self.screen_w // 2
+        y = self.screen_h // 2 + 110
+        line_h = 22
+
+        title = self.font_small.render("Your Position", True, (220, 220, 220))
+        screen.blit(title, (x - title.get_width() // 2, y))
+
+        for i, e in enumerate(entries):
+            mins = int(e["time"] // 60)
+            secs = int(e["time"] % 60)
+            prefix = ">> " if e == current_entry else "   "
+
+            txt = self.font_small.render(
+                f"{prefix}{e['name']}  {mins:02d}:{secs:02d}  K:{e['kills']}",
+                True,
+                (240, 240, 120) if e == current_entry else (200, 200, 200),
+            )
+
+            screen.blit(
+                txt,
+                (x - txt.get_width() // 2, y + 25 + i * line_h),
+            )
+    
+    def draw_commentary(self, screen, text):
+        if not text:
+            return
+
+        surf = self.font_small.render(text, True, (220, 220, 220))
+        bg = pygame.Surface((surf.get_width() + 20, surf.get_height() + 12), pygame.SRCALPHA)
+        bg.fill((0, 0, 0, 160))
+
+        x = self.screen_w // 2 - bg.get_width() // 2
+        y = self.screen_h - 80
+
+        screen.blit(bg, (x, y))
+        screen.blit(surf, (x + 10, y + 6))
+
+
+
