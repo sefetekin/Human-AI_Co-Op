@@ -1,7 +1,7 @@
 import pygame
+from yfinance import screen
 from game_manager import GameState
 from ui.select_buttons import SelectButtons
-
 
 class HUDRenderer:
     def __init__(self, screen_size):
@@ -130,18 +130,6 @@ class HUDRenderer:
         txt = self.font_small.render("Start Game", True, txtc)
         screen.blit(txt, (rect.centerx - txt.get_width() // 2, rect.centery - txt.get_height() // 2))
 
-    # =========================================================
-    # LOADING (DRAW ONLY)
-    # =========================================================
-
-    def draw_loading(self, screen):
-        screen.fill((15, 15, 15))
-        txt = self.font_large.render("Loading...", True, (220, 220, 220))
-        screen.blit(
-            txt,
-            (self.screen_w // 2 - txt.get_width() // 2,
-             self.screen_h // 2 - txt.get_height() // 2),
-        )
 
     # =========================================================
     # Core HUD
@@ -318,4 +306,41 @@ class HUDRenderer:
         screen.blit(surf, (x + 10, y + 6))
 
 
+    # =========================================================
+    # LOADING (DRAW ONLY)
+    # =========================================================
+    def draw_loading(self, screen, progress):
+        completed, total, message = progress.snapshot()
 
+        screen.fill((15, 15, 15))
+
+        if total > 0:
+            ratio = completed / total
+        else:
+            ratio = 0
+
+        # ---- Title text ("Generating") ----
+        title = self.font_large.render(
+            "Generating",
+            True,
+            (200, 200, 200),
+        )
+        title_rect = title.get_rect(center=(400, 200))
+        screen.blit(title, title_rect)
+
+        # ---- Progress bar ----
+        pygame.draw.rect(screen, (40, 40, 40), (200, 300, 400, 25))
+        pygame.draw.rect(
+            screen,
+            (100, 200, 100),
+            (200, 300, int(400 * ratio), 25),
+        )
+
+        # ---- Status text ----
+        text = self.font_large.render(
+            f"{message} ({completed}/{total})",
+            True,
+            (255, 255, 255),
+        )
+        text_rect = text.get_rect(center=(400, 260))
+        screen.blit(text, text_rect)

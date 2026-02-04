@@ -1,3 +1,4 @@
+from concurrent.futures import process
 from pathlib import Path
 import subprocess
 import sys
@@ -76,10 +77,8 @@ def create_asset(
     # Decide prompt source: explicit override -> GPT (if enabled) -> local generator
     if prompt_override is not None:
         prompt = prompt_override
-        print("Using overridden prompt:", prompt)
     else:
         prompt = generate_prompt_with_gpt4all(traits or {}, template_path.name, model=gpt_model)
-        print("Generated prompt:", prompt)
     cmd = [
         sys.executable,
         str(SYNTH_SCRIPT),
@@ -94,10 +93,9 @@ def create_asset(
     ]
     # run external synthesis script and stream its output to the terminal
     # (do not capture output so progress bars/logs are visible)
-    res = subprocess.run(cmd)
-    if res.returncode != 0:
-        raise RuntimeError(f"Image synthesis failed (rc={res.returncode})")
-    return output_path
+    process = subprocess.Popen(cmd)
+
+    return process
 
 
 

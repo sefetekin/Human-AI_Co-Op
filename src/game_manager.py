@@ -10,6 +10,7 @@ import math
 import threading
 from assets import create_asset
 from comment_manager import CommentaryManager
+from loading_process import LoadingProgress
 
 class GameState(Enum):
     PLAYER_SETUP = auto()
@@ -97,6 +98,9 @@ class GameManager:
         self.loading_done = False
 
         self.commentator = None
+        self.loading_progress = LoadingProgress()
+        self.shutting_down = False
+
 
 
 
@@ -331,93 +335,77 @@ class GameManager:
         if getattr(self, "loading_thread", None) and self.loading_thread.is_alive():
             return  # already loading
 
+        
         self.state = GameState.LOADING
         self.loading_done = False
         self.clear_folder("../outputs")
 
         self.loading_thread = threading.Thread(
-            target=self._run_loading_script,
+            target=self._run_loading,
             daemon=True,
         )
         self.loading_thread.start()
 
 
-    def _run_loading_script(self):
+    def _run_loading(self):
         try:
-            self._run_loading_script_forest()
-            self._run_loading_script_desert()
-            self._run_loading_script_rocks()
+            self._run_loading_scripts()
         finally:
             self.loading_done = True
 
+    def _run_loading_scripts(self, multi_processing: bool = False):
+        terrain_types = {
+            "Forest": "grassy ground of a forest",
+            "Desert": "sand with hills and Tumbleweed",
+            "Rocky": "rocky terrain of a mountain",
+        }
 
-    def _run_loading_script_forest(self):
-        # simulate some loading / preprocessing work
-        create_asset(
-            template_path=Path("templates/plain_grass.png"), 
-            prompt_override="a 2D Pixel Art game asset representing grassy ground of a forest texture from bird's eye view", 
-            output_path=Path("outputs/plain_forest.jpg"), 
-            radius=10
-            )
-        
-        create_asset(
-            template_path=Path("templates/dirt_with_stones.png"), 
-            prompt_override="a 2D Pixel Art game asset representing grassy ground of a forest texture from bird's eye view", 
-            output_path=Path("outputs/forest_small.jpg"), 
-            radius=10
-            )
-        
-        create_asset(
-            template_path=Path("templates/dirt_with_rocks.png"), 
-            prompt_override="a 2D Pixel Art game asset representing grassy ground of a forest texture from bird's eye view", 
-            output_path=Path("outputs/forest_big.jpg"), 
-            radius=10
-            )
+        input_types = {
+            "plain_grass": "plain",
+            "dirt_with_stones": "small",
+            "dirt_with_rocks": "big",
+        }
 
-    def _run_loading_script_desert(self):
-        # simulate some loading / preprocessing work
-        create_asset(
-            template_path=Path("templates/plain_grass.png"), 
-            prompt_override="a 2D Pixel Art game asset representing sand with hills and Tumbleweed texture from bird's eye view", 
-            output_path=Path("outputs/desert_plain.jpg"), 
-            radius=10
-            )
-        
-        create_asset(
-            template_path=Path("templates/dirt_with_stones.png"), 
-            prompt_override="a 2D Pixel Art game asset representing sand with hills and Tumbleweed texture from bird's eye view", 
-            output_path=Path("outputs/desert_small.jpg"), 
-            radius=10
-            )
-        
-        create_asset(
-            template_path=Path("templates/dirt_with_rocks.png"), 
-            prompt_override="a 2D Pixel Art game asset representing sand with hills and Tumbleweed texture from bird's eye view", 
-            output_path=Path("outputs/desert_big.jpg"), 
-            radius=10
-            )
-    
-    def _run_loading_script_rocks(self):
-        # simulate some loading / preprocessing work
-        create_asset(
-            template_path=Path("templates/plain_grass.png"), 
-            prompt_override="a 2D Pixel Art game asset representing rocky terrain of a mountain texture from bird's eye view", 
-            output_path=Path("outputs/rock_plain.jpg"), 
-            radius=10
-            )
-        create_asset(
-            template_path=Path("templates/dirt_with_stones.png"), 
-            prompt_override="a 2D Pixel Art game asset representing rocky terrain of a mountain texture from bird's eye view", 
-            output_path=Path("outputs/rock_small.jpg"), 
-            radius=10
-            )
-        create_asset(
-            template_path=Path("templates/dirt_with_rocks.png"), 
-            prompt_override="a 2D Pixel Art game asset representing rocky terrain of a mountain texture from bird's eye view", 
-            output_path=Path("outputs/rock_big.jpg"), 
-            radius=10
-            )
-    
+        total_assets = len(terrain_types) * len(input_types)
+        self.loading_progress.set_total(total_assets)
+
+        self.asset_processes = []
+
+        # ---- start all processes ----
+        for terrain, description in terrain_types.items():
+            for input_type, output_type in input_types.items():
+                self.loading_progress.advance(
+                    0, f"{terrain} - {output_type}"
+                )
+
+                process = create_asset(
+                    template_path=Path(f"templates/{input_type}.png"),
+                    prompt_override=(
+                        f"a 2D Pixel Art game asset representing "
+                        f"{description} texture from bird's eye view"
+                    ),
+                    output_path=Path(
+                        f"outputs/{terrain.lower()}_{output_type}.jpg"
+                    ),
+                    radius=10,
+                )
+
+                self.asset_processes.append(process)
+                
+                if not multi_processing:
+                    # Wait for current asset
+                    while process.poll() is None:
+                        if self.shutting_down:
+                            process.terminate()
+                            return
+                        time.sleep(0.1)
+                    self.loading_progress.advance(1)
+
+        if multi_processing:
+            for p in self.asset_processes:
+                p.wait()
+                self.loading_progress.advance(1)
+
     def clear_folder(self, path: str):
         from pathlib import Path
         import shutil

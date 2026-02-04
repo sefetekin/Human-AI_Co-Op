@@ -120,7 +120,15 @@ while running:
     # ====================
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
+            game_manager.shutting_down = True
+            if hasattr(game_manager, "asset_processes"):
+                for p in game_manager.asset_processes:
+                    print(p)
+                    if p.poll() is None:
+                        p.terminate()
+
             running = False
+
 
         # ---------- PLAYER SETUP ----------
         if game_manager.state == GameState.PLAYER_SETUP:
@@ -257,7 +265,13 @@ while running:
         hud_renderer.draw_player_setup(screen, setup_ui)
 
     elif game_manager.state == GameState.LOADING:
-        hud_renderer.draw_loading(screen)
+        hud_renderer.draw_loading(
+            screen,
+            game_manager.loading_progress
+        )
+
+        if not game_manager.loading_thread.is_alive():
+            game_manager.state = GameState.PLAYING
 
     elif game_manager.state == GameState.SCOREBOARD:
         entries = scoreboard.get_entries()
