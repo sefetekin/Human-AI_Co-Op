@@ -12,7 +12,7 @@ def load_images_from_folder(
 
     if not path.exists():
         raise FileNotFoundError(f"Folder not found: {folder}")
-
+    
     for file in sorted(path.iterdir()):
         if file.suffix.lower() in (".png", ".jpg", ".jpeg"):
             img = pygame.image.load(file)

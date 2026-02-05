@@ -123,7 +123,6 @@ while running:
             game_manager.shutting_down = True
             if hasattr(game_manager, "asset_processes"):
                 for p in game_manager.asset_processes:
-                    print(p)
                     if p.poll() is None:
                         p.terminate()
 
