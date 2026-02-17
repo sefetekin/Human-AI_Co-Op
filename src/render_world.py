@@ -4,6 +4,7 @@ from collections import defaultdict
 
 import pygame
 from pygame.math import Vector2
+import math
 
 from world_objects import WorldObjectManager, CHUNK_SIZE
 from asset_loader import load_images_from_folder
@@ -68,8 +69,10 @@ class WorldRenderer:
         self._draw_player(screen, player)
 
     def get_terrain_at_world_pos(self, world_pos: Vector2) -> str:
-        cx = int(world_pos.x // CHUNK_SIZE)
-        cy = int(world_pos.y // CHUNK_SIZE)
+        
+
+        cx = math.floor(world_pos.x / CHUNK_SIZE)
+        cy = math.floor(world_pos.y / CHUNK_SIZE)
         return self._get_terrain_for_chunk(cx, cy)
 
     # ==================================================

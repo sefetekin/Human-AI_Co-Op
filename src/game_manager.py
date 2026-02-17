@@ -137,7 +137,7 @@ class GameManager:
         self.kill_count = 0
 
 
-    def tick(self, dt: float, player: Character, enemies: List[Enemy], current_terrain: str):
+    def tick(self, dt: float, player: Character, enemies: List[Enemy], current_terrain: str, world_objects=None):
         # ---------- LOADING ----------
         if self.state == GameState.LOADING:
             if self.loading_done:
@@ -155,7 +155,7 @@ class GameManager:
         self.elapsed_time += dt
         
         self._second_tick(dt, player, enemies, current_terrain)
-        self._spawn_tick(dt, player, enemies)
+        self._spawn_tick(dt, player, enemies, world_objects)
         self._death_check(player, enemies)
     
 
@@ -244,7 +244,7 @@ class GameManager:
     # Spawn logic
     # =========================================================
 
-    def _spawn_tick(self, dt: float, player: Character, enemies: List[Enemy]):
+    def _spawn_tick(self, dt: float, player: Character, enemies: List[Enemy], world_objects=None):
         self.spawn_timer += dt
         if self.spawn_timer < self.spawn_interval:
             return
@@ -280,7 +280,7 @@ class GameManager:
         )
 
         for _ in range(self.spawn_count):
-            enemies.append(self._spawn_enemy(player.pos))
+            enemies.append(self._spawn_enemy(player.pos, world_objects))
 
         self.last_spawn_enemy_count = len(enemies)
 
@@ -319,7 +319,7 @@ class GameManager:
 
                 return
 
-    def _spawn_enemy(self, player_pos: Vector2) -> Enemy:
+    def _spawn_enemy(self, player_pos: Vector2, world_objects) -> Enemy:
         angle = random.random() * math.tau
         dist = random.uniform(self.min_spawn_dist, self.max_spawn_dist)
 
@@ -329,7 +329,15 @@ class GameManager:
         )
 
         speed = random.uniform(*self.enemy_speed_range)
-        return Enemy(pos, speed=speed)
+        enemy = Enemy(pos, speed=speed)
+
+        enemy.pos = world_objects.resolve_circle_penetration(
+            enemy.pos,
+            enemy.radius
+        )
+
+        return enemy
+
     
     def start_loading(self):
         if getattr(self, "loading_thread", None) and self.loading_thread.is_alive():
@@ -356,14 +364,15 @@ class GameManager:
     def _run_loading_scripts(self, multi_processing: bool = False):
         terrain_types = {
             "Forest": "grassy ground of a forest",
-            "Desert": "sand with hills and Tumbleweed",
-            "Rocky": "rocky terrain of a mountain",
+            #"Desert": "sand with hills and Tumbleweed",
+            "Rock": "rocky terrain of a mountain",
+            #"Swamp": "swamp",
         }
 
         input_types = {
-            "plain_grass": "plain",
+            # "plain_grass": "plain",
             "dirt_with_stones": "small",
-            "dirt_with_rocks": "big",
+            # "dirt_with_rocks": "big",
         }
 
         total_assets = len(terrain_types) * len(input_types)

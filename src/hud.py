@@ -71,7 +71,7 @@ class HUDRenderer:
         setup_ui.caption_buttons.draw(screen, self.font_small)
 
         # ---------- Title ----------
-        title = self.font_large.render("Player Setup", True, (220, 220, 220))
+        title = self.font_large.render("Story Arc", True, (220, 220, 220))
         screen.blit(title, (self.screen_w // 2 - title.get_width() // 2, 60))
 
         # ---------- Labels ----------

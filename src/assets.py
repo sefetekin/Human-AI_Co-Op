@@ -66,7 +66,7 @@ def create_asset(
     prompt_override: str = None,
     traits: dict | None = None,
     gpt_model: str | None = None,
-    radius: int = 1,
+    radius: int = 15,
     output_path: Path = None,
 ):
     if not template_path.exists():
@@ -192,3 +192,19 @@ __all__ = [
     "generate_commentary_with_gpt4all"
     ]
 
+if __name__ == "__main__":
+    create_asset(
+        template_path=Path(f"templates/dirt_with_stones.png"),
+        prompt_override=(
+            f"a 2D 128x128 Pixel Art game background representing "
+            f"desert texture from top-down (bird's eye) view"
+        ),
+        output_path=Path(
+            f"outputs/desert_test_1.png"
+        ),
+        radius=15,
+    )
+    
+# rocky highland terrain
+# cliffside rocky terrain
+# swamp marsh terrain

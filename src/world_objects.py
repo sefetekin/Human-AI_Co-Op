@@ -14,18 +14,35 @@ def world_to_chunk(pos: Vector2):
 
 class WorldObject:
     def __init__(self, pos: Vector2, image: pygame.Surface):
-        self.pos = Vector2(pos)
+        self.pos = Vector2(pos)               # world-space center
         self.image = image
         self.offset = Vector2(image.get_size()) / 2
+
+        w, h = self.image.get_size()
+        self.world_rect = pygame.Rect(
+            int(self.pos.x - w / 2),
+            int(self.pos.y - h / 2),
+            w, h
+        )
 
     def draw(self, screen, to_screen):
         p = to_screen(self.pos)
         screen.blit(self.image, p - self.offset)
 
 
+
 class WorldObjectManager:
     def __init__(self, prop_images):
-        self.prop_images = prop_images
+        self.prop_images = []
+
+        for img in prop_images:
+            w, h = img.get_size()
+            scaled = pygame.transform.smoothscale(
+                img,
+                (w // 4, h // 4)
+            )
+            self.prop_images.append(scaled)
+
         self.generated_chunks = set()
         self.objects = []
 
@@ -52,4 +69,64 @@ class WorldObjectManager:
             self.objects.append(WorldObject((x, y), img))
 
         self.generated_chunks.add(chunk)
+    
+    def collides_circle(self, center: Vector2, radius: float) -> bool:
+        # Circle vs AABB collision
+        r2 = radius * radius
 
+        for obj in self.objects:
+            rect = obj.world_rect
+
+            # closest point on rect to circle center
+            cx = max(rect.left, min(center.x, rect.right))
+            cy = max(rect.top,  min(center.y, rect.bottom))
+
+            dx = center.x - cx
+            dy = center.y - cy
+
+            if dx*dx + dy*dy <= r2:
+                return True
+
+        return False
+
+    def resolve_circle_penetration(self, pos: Vector2, radius: float) -> Vector2:
+
+        corrected = Vector2(pos)
+
+        for obj in self.objects:
+            rect = obj.world_rect
+
+            # find closest point on rect
+            closest = Vector2(
+                max(rect.left, min(corrected.x, rect.right)),
+                max(rect.top,  min(corrected.y, rect.bottom))
+            )
+
+            offset = corrected - closest
+            dist = offset.length()
+
+            if dist < radius:
+                # push out along smallest axis
+                if dist == 0:
+                    # fully inside → pick shortest exit
+                    dx_left  = abs(corrected.x - rect.left)
+                    dx_right = abs(rect.right - corrected.x)
+                    dy_top   = abs(corrected.y - rect.top)
+                    dy_bot   = abs(rect.bottom - corrected.y)
+
+                    m = min(dx_left, dx_right, dy_top, dy_bot)
+
+                    if m == dx_left:
+                        corrected.x = rect.left - radius
+                    elif m == dx_right:
+                        corrected.x = rect.right + radius
+                    elif m == dy_top:
+                        corrected.y = rect.top - radius
+                    else:
+                        corrected.y = rect.bottom + radius
+
+                else:
+                    push = offset.normalize() * (radius - dist)
+                    corrected += push
+
+        return corrected

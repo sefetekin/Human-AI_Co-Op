@@ -177,10 +177,11 @@ while running:
 
     elif game_manager.state == GameState.PLAYING:
         keys = pygame.key.get_pressed()
-        player.update(dt, keys)
+        player.update(dt, world_renderer.world_objects, keys)
 
         for e in enemies:
-            e.update(dt, player.pos)
+            e.update(dt, player.pos, world_renderer.world_objects)
+
 
         # Shield kills
         killed = player.kill_enemies(enemies)
@@ -189,7 +190,9 @@ while running:
             game_manager.kill_count += 1
 
         # Core game logic (spawning, difficulty, death)
-        game_manager.tick(dt, player, enemies, world_renderer.get_terrain_at_world_pos(player.pos))
+        game_manager.tick(dt, player, enemies, 
+                          world_renderer.get_terrain_at_world_pos(player.pos),
+                          world_renderer.world_objects)
 
         # Death transition
         if game_manager.state == GameState.GAME_OVER:
