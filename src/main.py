@@ -139,7 +139,7 @@ while running:
                 
                 game_manager.commentator = CommentaryManager(
                     traits=game_manager.player_profile,
-                    llm_func="curl",
+                    llm_func="request",
                 )
                 if game_manager.player_profile["captions"] == "Caption OFF":
                     game_manager.commentator.enabled = False
