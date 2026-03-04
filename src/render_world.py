@@ -61,10 +61,10 @@ class WorldRenderer:
     # Public
     # ==================================================
 
-    def draw(self, screen, player, enemies):
+    def draw(self, screen, player, enemies, dt):
         self._draw_background(screen, player)
         self.world_objects.update(player.pos)
-        self._draw_world_objects(screen, player)
+        self._draw_world_objects(screen, player, dt)
         self._draw_enemies(screen, player, enemies)
         self._draw_player(screen, player)
 
@@ -139,9 +139,13 @@ class WorldRenderer:
     # World objects & entities
     # ==================================================
 
-    def _draw_world_objects(self, screen, player):
+    def _draw_world_objects(self, screen, player, dt):
         for obj in self.world_objects.objects:
             obj.draw(screen, player.world_to_screen)
+
+        for c in self.world_objects.collectibles:
+            c.update(dt)
+            c.draw(screen, player.world_to_screen)
 
     def _draw_enemies(self, screen, player, enemies):
         for e in enemies:

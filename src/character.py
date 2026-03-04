@@ -144,10 +144,10 @@ class Character:
         }
 
         direction_cols = {
-            "down": 0,
-            "up": 1,
-            "left": 2,
-            "right": 3
+            "down": 2,
+            "up": 3,
+            "left": 1,
+            "right": 0
         }
 
         target_size = player_radius * 2

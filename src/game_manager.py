@@ -89,6 +89,13 @@ class GameManager:
         self.last_spawn_enemy_count = 0
         self.current_enemy_count = 0
         self.enemy_count_delta = 0
+        
+        self.collectible_spawn_min = 5.0
+        self.collectible_spawn_max = 12.0
+        self.collectible_spawn_timer = random.uniform(
+            self.collectible_spawn_min,
+            self.collectible_spawn_max
+        )
 
         # ---------- reference ----------
         self.shield_radius = None
@@ -156,7 +163,9 @@ class GameManager:
         
         self._second_tick(dt, player, enemies, current_terrain)
         self._spawn_tick(dt, player, enemies, world_objects)
+        self._collectible_spawn_tick(dt, player, world_objects)
         self._death_check(player, enemies)
+
     
 
 
@@ -363,16 +372,12 @@ class GameManager:
 
     def _run_loading_scripts(self, multi_processing: bool = False):
         terrain_types = {
-            "Forest": "grassy ground of a forest",
+            "Mountain": "Mountain",
             #"Desert": "sand with hills and Tumbleweed",
-            "Rock": "rocky terrain of a mountain",
-            #"Swamp": "swamp",
+            "Toys": "Dinasaur Toys",
         }
-
         input_types = {
-            # "plain_grass": "plain",
             "dirt_with_stones": "small",
-            # "dirt_with_rocks": "big",
         }
 
         total_assets = len(terrain_types) * len(input_types)
@@ -390,8 +395,8 @@ class GameManager:
                 process = create_asset(
                     template_path=Path(f"templates/{input_type}.png"),
                     prompt_override=(
-                        f"a 2D Pixel Art game asset representing "
-                        f"{description} texture from bird's eye view"
+                        f"a low-contrast 2D Pixel Art game asset representing "
+                        f"a ground full of {description} texture from bird's eye view"
                     ),
                     output_path=Path(
                         f"outputs/{terrain.lower()}_{output_type}.jpg"
@@ -429,3 +434,27 @@ class GameManager:
 
         shutil.rmtree(folder)
         folder.mkdir()
+    
+    def _collectible_spawn_tick(self, dt, player, world_objects):
+
+        self.collectible_spawn_timer -= dt
+
+        if self.collectible_spawn_timer > 0:
+            return
+
+        # reset timer
+        self.collectible_spawn_timer = random.uniform(
+            self.collectible_spawn_min,
+            self.collectible_spawn_max
+        )
+
+        # spawn position around player
+        angle = random.random() * math.tau
+        dist = random.uniform(120, 350)
+
+        pos = Vector2(
+            player.pos.x + math.cos(angle) * dist,
+            player.pos.y + math.sin(angle) * dist,
+        )
+
+        world_objects.spawn_collectible(pos)

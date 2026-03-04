@@ -27,3 +27,9 @@ class GameConfig:
 
     # --- lives ---
     initial_lives: int = 2
+    
+    # --- collectibles ---
+    collectible_spawn_min: float = 5.0
+    collectible_spawn_max: float = 12.0
+    collectible_spawn_distance_min: float = 80.0
+    collectible_spawn_distance_max: float = 300.0

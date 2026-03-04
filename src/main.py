@@ -178,6 +178,23 @@ while running:
     elif game_manager.state == GameState.PLAYING:
         keys = pygame.key.get_pressed()
         player.update(dt, world_renderer.world_objects, keys)
+        
+        for c in world_renderer.world_objects.collectibles[:]:
+            if c.collides_with_player(player):
+                if c.type.name == "HEART":
+                    game_manager.lives = min(
+                        game_manager.initial_lives,
+                        game_manager.lives + 1
+                    )
+                elif c.type.name == "SHIELD":
+                    player.shield_segments += 1
+                elif c.type.name == "BROKEN_SHIELD":
+                    player.shield_segments = max(0, player.shield_segments - 1)
+                elif c.type.name == "LIGHTNING":
+                    player.speed *= 1.25
+                elif c.type.name == "TRAP":
+                    player.speed *= 0.75
+                world_renderer.world_objects.collectibles.remove(c)
 
         for e in enemies:
             e.update(dt, player.pos, world_renderer.world_objects)
@@ -280,7 +297,7 @@ while running:
         scoreboard_renderer.draw(screen, entries)
 
     else:
-        world_renderer.draw(screen, player, enemies)
+        world_renderer.draw(screen, player, enemies, dt)
         hud_renderer.draw(
             screen,
             game_manager,

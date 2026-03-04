@@ -1,6 +1,16 @@
+import math
 import random
 import pygame
 from pygame.math import Vector2
+from enum import Enum, auto
+
+class CollectibleType(Enum):
+    HEART = auto()
+    SHIELD = auto()
+    BROKEN_SHIELD = auto()
+    LIGHTNING = auto()
+    TRAP = auto()
+
 
 CHUNK_SIZE = 800
 
@@ -30,10 +40,66 @@ class WorldObject:
         screen.blit(self.image, p - self.offset)
 
 
+class Collectible:
+    def __init__(self, pos: Vector2, image: pygame.Surface, ctype: CollectibleType):
+        self.pos = Vector2(pos)
+        self.image = image
+        self.type = ctype
+        self.time = random.random() * 2 * math.pi   # start phase random
+        self.bob_speed = 1.8
+        self.bob_height = 4
+
+        self.offset = Vector2(image.get_size()) / 2
+        w, h = self.image.get_size()
+
+        self.radius = max(w, h) / 2
+
+    def update(self, dt):
+        self.time += dt * self.bob_speed
+
+    def draw(self, screen, to_screen):
+        p = to_screen(self.pos)
+
+        bob_offset = math.sin(self.time) * self.bob_height
+
+        screen.blit(
+            self.image,
+            (p.x - self.offset.x, p.y - self.offset.y + bob_offset)
+        )
+
+    def collides_with_player(self, player):
+        return (player.pos - self.pos).length() <= (player.player_radius + self.radius)
 
 class WorldObjectManager:
     def __init__(self, prop_images):
         self.prop_images = []
+        self.collectibles = []
+        self.collectible_images = {
+            CollectibleType.HEART: pygame.image.load(
+                "assets/collectibles/heart.png"
+            ).convert_alpha(),
+
+            CollectibleType.SHIELD: pygame.image.load(
+                "assets/collectibles/shield.png"
+            ).convert_alpha(),
+
+            CollectibleType.BROKEN_SHIELD: pygame.image.load(
+                "assets/collectibles/broken_shield.png"
+            ).convert_alpha(),
+
+            CollectibleType.LIGHTNING: pygame.image.load(
+                "assets/collectibles/lightning.png"
+            ).convert_alpha(),
+
+            CollectibleType.TRAP: pygame.image.load(
+                "assets/collectibles/trap.png"
+            ).convert_alpha(),
+        }
+        for k in self.collectible_images:
+            self.collectible_images[k] = pygame.transform.smoothscale(
+                self.collectible_images[k],
+                (24, 24)
+            )
 
         for img in prop_images:
             w, h = img.get_size()
@@ -69,6 +135,12 @@ class WorldObjectManager:
             self.objects.append(WorldObject((x, y), img))
 
         self.generated_chunks.add(chunk)
+        
+        # spawn collectibles
+        if rng.random() < 0.5:
+            x = cx * CHUNK_SIZE + rng.randint(0, CHUNK_SIZE)
+            y = cy * CHUNK_SIZE + rng.randint(0, CHUNK_SIZE)
+            self.spawn_collectible(Vector2(x, y))
     
     def collides_circle(self, center: Vector2, radius: float) -> bool:
         # Circle vs AABB collision
@@ -130,3 +202,22 @@ class WorldObjectManager:
                     corrected += push
 
         return corrected
+    def spawn_collectible(self, pos):
+
+        types = [
+            CollectibleType.HEART,
+            CollectibleType.SHIELD,
+            CollectibleType.BROKEN_SHIELD,
+            CollectibleType.LIGHTNING,
+            CollectibleType.TRAP,
+        ]
+
+        probabilities = [0.2, 0.2, 0.2, 0.2, 0.2]
+
+        ctype = random.choices(types, probabilities)[0]
+
+        image = self.collectible_images[ctype]
+
+        self.collectibles.append(
+            Collectible(pos, image, ctype)
+        )

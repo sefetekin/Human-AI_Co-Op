@@ -108,27 +108,29 @@ class CommentaryManager:
         )
 
         payload = {
-            "model": "gemma3:4b",   # match what you're serving remotely
-            "stream": False,
+            "model": model,
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            "temperature": 0.6,
-            "max_tokens": 40
+            "stream": False,
+            "options": {
+                "temperature": temperature,
+                "num_predict": max_tokens  # Fixed key name
+            }
         }
 
         try:
+            # Use 127.0.0.1 to be safe against IPv6 resolution issues
             response = requests.post(
-                "http://localhost:11434/api/chat",   # 🚨 THIS IS THE BIG CHANGE
+                "http://127.0.0.1:11434/api/chat", 
                 json=payload,
-                timeout=5
+                timeout=10 # Increased slightly for remote hop latency
             )
-
+            response.raise_for_status() # This will tell you if the server said "No"
             data = response.json()
-
             return data["message"]["content"].strip()
-
+        
         except Exception as e:
             print("LLM commentary error:", e)
             return ""
@@ -213,5 +215,4 @@ class CommentaryManager:
     #     if self.tunnel_proc:
     #         print("[Tunnel] Closing SSH tunnel")
     #         self.tunnel_proc.terminate()
-
 
