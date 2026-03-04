@@ -372,14 +372,17 @@ class GameManager:
 
     def _run_loading_scripts(self, multi_processing: bool = False):
         terrain_types = {
-            "Mountain": "Mountain",
+            "Rock": "rocky terrain of a mountain",
             #"Desert": "sand with hills and Tumbleweed",
-            "Toys": "Dinasaur Toys",
+            "Forest": "grassy ground of a forest",
         }
         input_types = {
             "dirt_with_stones": "small",
         }
-
+        inputted_types = self.player_profile["background"]
+        for t in inputted_types:
+            if t not in terrain_types:
+                terrain_types[t] = f"a ground full of {t}"
         total_assets = len(terrain_types) * len(input_types)
         self.loading_progress.set_total(total_assets)
 
@@ -396,7 +399,7 @@ class GameManager:
                     template_path=Path(f"templates/{input_type}.png"),
                     prompt_override=(
                         f"a low-contrast 2D Pixel Art game asset representing "
-                        f"a ground full of {description} texture from bird's eye view"
+                        f"{description} texture from bird's eye view"
                     ),
                     output_path=Path(
                         f"outputs/{terrain.lower()}_{output_type}.jpg"

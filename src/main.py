@@ -151,6 +151,7 @@ while running:
                     game_manager.start_loading()
                 else:
                     # ✅ skip generation but still move forward cleanly
+                    background_objects = []
                     game_manager.loading_done = True
                     game_manager.state = GameState.LOADING
 

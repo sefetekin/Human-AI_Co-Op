@@ -70,6 +70,7 @@ class HUDRenderer:
 
         setup_ui.caption_buttons.draw(screen, self.font_small)
 
+        
         # ---------- Title ----------
         title = self.font_large.render("Story Arc", True, (220, 220, 220))
         screen.blit(title, (self.screen_w // 2 - title.get_width() // 2, 60))
@@ -83,12 +84,16 @@ class HUDRenderer:
         draw_label("Age Group *",     setup_ui.age_label_y)
         draw_label("Mood *",          setup_ui.mood_label_y)
         draw_label("Likes",           setup_ui.likes_label_y)
+        draw_label("Background Object", setup_ui.background_label_y)
+
 
         # ---------- Widgets ----------
         setup_ui.name_input.draw(screen, self.font_small)
         setup_ui.age_group_buttons.draw(screen, self.font_small)
         setup_ui.mood_buttons.draw(screen, self.font_small)
         setup_ui.likes_input.draw(screen, self.font_small)
+        setup_ui.background_buttons.draw(screen, self.font_small)
+        setup_ui.background_input.draw(screen, self.font_small)
 
         # ---------- Start ----------
         self._draw_start_button(
@@ -100,17 +105,6 @@ class HUDRenderer:
         # ---------- Scoreboard button ----------
         self.scoreboard_button.draw(screen, self.font_small)
         
-        # ---------- Hint ----------
-        hint = self.font_small.render(
-            "Click a field to type. Select an age group and mood.",
-            True,
-            (160, 160, 160),
-        )
-        screen.blit(
-            hint,
-            (self.screen_w // 2 - hint.get_width() // 2, self.screen_h - 40),
-        )
-
     
     def _label(self, screen, text, y):
         surf = self.font_small.render(text, True, (200, 200, 200))

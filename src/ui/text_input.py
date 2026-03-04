@@ -10,8 +10,12 @@ class TextInput:
 
         self.text = ""
         self.active = False
+        self.enabled = True
 
     def handle_event(self, event: pygame.event.Event):
+        if not self.enabled:
+            return
+
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             self.active = self.rect.collidepoint(event.pos)
 
@@ -36,7 +40,12 @@ class TextInput:
             self.text += ch
 
     def draw(self, screen: pygame.Surface, font: pygame.font.Font):
-        border = (255, 255, 255) if self.active else (160, 160, 160)
+        if not self.enabled:
+            border = (80,80,80)
+        elif self.active:
+            border = (255,255,255)
+        else:
+            border = (160,160,160)
         pygame.draw.rect(screen, border, self.rect, 2, border_radius=6)
 
         shown = self.text if self.text else self.placeholder

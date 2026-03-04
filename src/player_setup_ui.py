@@ -32,7 +32,7 @@ class PlayerSetupUI:
         SECTION_GAP = 28
 
         LEFT_X = (w - COLUMN_W) // 2
-        y = 140   # top anchor for the form
+        y = 110   # top anchor for the form
 
         
         # ---------- Name ----------
@@ -83,7 +83,29 @@ class PlayerSetupUI:
             placeholder="Likes (e.g. music, games)",
         )
         y += FIELD_H + SECTION_GAP
+        # ---------- Background Object ----------
+        self.background_label_y = y
+        y += GAP
 
+        btn_w = (COLUMN_W - 20) // 3
+        btn_h = FIELD_H
+
+        self.background_buttons = SelectButtons([
+            ("Mountain",       (LEFT_X,               y, btn_w, btn_h)),
+            ("Toy Dinosaurs",  (LEFT_X + btn_w + 10,  y, btn_w, btn_h)),
+            ("Houses",         (LEFT_X + 2*(btn_w+10),y, btn_w, btn_h)),
+        ])
+
+        y += FIELD_H + GAP
+
+        self.background_input = TextInput(
+            (LEFT_X, y, COLUMN_W, FIELD_H),
+            numeric=False,
+            max_len=48,
+            placeholder="Desert, Forest, Rock",
+        )
+
+        y += FIELD_H + SECTION_GAP
         # ---------- Start ----------
         self.start_rect = pygame.Rect(
             LEFT_X,
@@ -99,6 +121,7 @@ class PlayerSetupUI:
     def handle_event(self, event):
         self.start_requested = False
 
+        # --- always active fields ---
         self.name_input.handle_event(event)
         self.likes_input.handle_event(event)
         self.age_group_buttons.handle_event(event)
@@ -106,7 +129,23 @@ class PlayerSetupUI:
         self.content_gen_buttons.handle_event(event)
         self.caption_buttons.handle_event(event)
 
+        # --- determine generation state ---
+        gen_on = self.content_gen_buttons.selected == "Gen ON"
 
+        # enable / disable controls
+        self.background_buttons.enabled = gen_on
+        self.background_input.enabled = gen_on
+
+        # reset when turning off
+        if not gen_on:
+            self.background_buttons.selected = None
+            self.background_input.text = ""
+
+        # --- now process events for background ---
+        self.background_buttons.handle_event(event)
+        self.background_input.handle_event(event)
+
+        # --- start button ---
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.is_valid() and self.start_rect.collidepoint(event.pos):
                 self.start_requested = True
@@ -125,6 +164,9 @@ class PlayerSetupUI:
         self.content_gen_buttons.selected = "Gen OFF"
 
         self.start_requested = False
+        self.background_buttons.selected = None
+        self.background_input.text = ""
+        self.background_input.active = False
 
     def is_valid(self):
         return (
@@ -140,4 +182,20 @@ class PlayerSetupUI:
             "likes": self.likes_input.text.strip(),
             "content_generation": self.content_gen_buttons.selected,
             "captions": self.caption_buttons.selected,
+            "background": self.get_background_objects(),
         }
+    
+    def get_background_objects(self):
+        # textbox overrides button
+        bg_text = self.background_input.text.strip()
+
+        if bg_text:
+            background_objects = [x.strip() for x in bg_text.split(",") if x.strip()]
+        elif self.background_buttons.selected:
+            background_objects = [self.background_buttons.selected]
+        else:
+            background_objects = []
+        return background_objects
+    
+    def content_gen_enabled(self):
+        return self.content_gen_buttons.selected == "Gen ON"
