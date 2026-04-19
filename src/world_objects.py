@@ -136,11 +136,6 @@ class WorldObjectManager:
 
         self.generated_chunks.add(chunk)
         
-        # spawn collectibles
-        if rng.random() < 0.5:
-            x = cx * CHUNK_SIZE + rng.randint(0, CHUNK_SIZE)
-            y = cy * CHUNK_SIZE + rng.randint(0, CHUNK_SIZE)
-            self.spawn_collectible(Vector2(x, y))
     
     def collides_circle(self, center: Vector2, radius: float) -> bool:
         # Circle vs AABB collision
@@ -202,7 +197,7 @@ class WorldObjectManager:
                     corrected += push
 
         return corrected
-    def spawn_collectible(self, pos):
+    def spawn_collectible(self, pos, difficulty_score=0.5):
 
         types = [
             CollectibleType.HEART,
@@ -212,7 +207,21 @@ class WorldObjectManager:
             CollectibleType.TRAP,
         ]
 
-        probabilities = [0.2, 0.2, 0.2, 0.2, 0.2]
+        pos_count = 3
+        neg_count = 2
+        # Positive: HEART, SHIELD, LIGHTNING
+        # Negative: BROKEN_SHIELD, TRAP
+
+        neg_weight = 0.5 + difficulty_score * 0.5   # → 0.5 → 1.0
+        pos_weight = 1 - neg_weight              # keeps total balanced
+
+        probabilities = [
+            pos_weight * 1/pos_count,  # HEART
+            pos_weight * 1/pos_count,  # SHIELD
+            neg_weight * 1/neg_count,   # BROKEN_SHIELD
+            pos_weight * 1/pos_count,  # LIGHTNING
+            neg_weight * 1/neg_count,   # TRAP
+        ]
 
         ctype = random.choices(types, probabilities)[0]
 

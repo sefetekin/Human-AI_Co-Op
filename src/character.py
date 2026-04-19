@@ -92,6 +92,7 @@ class Character:
         self.circle_color = circle_color
 
         self.shield_segments = max(0, int(shield_segments))
+        self.max_shield_segments = self.shield_segments
         self.shield_orbit_speed = float(shield_orbit_speed)
         self.shield_orbit_ball_radius = float(shield_orbit_ball_radius)
         self._shield_phase = 0.0  # radians
@@ -144,10 +145,10 @@ class Character:
         }
 
         direction_cols = {
-            "down": 2,
-            "up": 3,
-            "left": 1,
-            "right": 0
+            "down": 0,
+            "up": 1,
+            "left": 2,
+            "right": 3
         }
 
         target_size = player_radius * 2

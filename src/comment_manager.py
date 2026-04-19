@@ -92,6 +92,7 @@ class CommentaryManager:
             "Do not explain mechanics.\n"
             "Never mention exact numbers unless critical.\n"
             "Match tone to the player's mood.\n"
+            "If a time goal exists, occasionally comment on progress toward it.\n"
             f"Make it different in vocabulary from your previous comment of '{self.current_line}'.\n"
             "Output ONE short sentence only."
         )
@@ -215,4 +216,5 @@ class CommentaryManager:
     #     if self.tunnel_proc:
     #         print("[Tunnel] Closing SSH tunnel")
     #         self.tunnel_proc.terminate()
+
 

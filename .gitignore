@@ -3,3 +3,4 @@ scores.json
 models/
 .env
 TODO.md
+test.py

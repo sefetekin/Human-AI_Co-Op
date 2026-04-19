@@ -11,6 +11,8 @@ import threading
 from assets import create_asset
 from comment_manager import CommentaryManager
 from loading_process import LoadingProgress
+from logger import DifficultyLogger
+from test import generate_difficulty_score_with_request
 
 class GameState(Enum):
     PLAYER_SETUP = auto()
@@ -30,6 +32,11 @@ class GameManager:
         min_spawn_dist: float,
         max_spawn_dist: float,
         enemy_speed_range: tuple[float, float],
+        max_spawn_count: int,
+        min_spawn_count: int,
+        max_spawn_interval: float,
+        min_spawn_interval: float,
+        multipliers: dict[str, float]
     ):
         # ---------- game state ----------
         self.state = GameState.PLAYER_SETUP
@@ -67,21 +74,33 @@ class GameManager:
         self.default_max_enemy_speed = self.max_enemy_speed_limit
 
         # bounds
-        self.min_spawn_count = 3
-        self.max_spawn_count = 10
-        self.min_spawn_interval = 3.0
-        self.max_spawn_interval = 15.0
+        self.min_spawn_count = min_spawn_count
+        self.max_spawn_count = max_spawn_count
+        self.min_spawn_interval = min_spawn_interval
+        self.max_spawn_interval = max_spawn_interval
+        
+        self.multipliers = multipliers
 
         
 
         # ---------- metrics ----------
-        self.last_avg_enemy_distance = 0.0
+        self.last_avg_enemy_distance = max_spawn_dist
         self.prev_avg_enemy_distance = None
         self.avg_distance_history: List[float] = []
         self.max_history_len = 5
         self.kill_count = 0
         self.enemy_count_delta = 0
-        self.last_avg_enemy_distance = 0.0
+        self.metric_history: List[dict] = []
+        
+        # ---------- difficulty system ----------
+        self.difficulty_score = 0.5   # range [0, 1]
+        self.target_difficulty = 0.5
+
+        # time goal (0 = infinity)
+        self.time_goal = 0.0
+        
+        self.far_time = 0.0
+        self.close_time = 0.0
 
 
 
@@ -108,7 +127,11 @@ class GameManager:
         self.loading_progress = LoadingProgress()
         self.shutting_down = False
 
-
+        self.logger = DifficultyLogger()
+        # LLM async state
+        self.llm_thread = None
+        self.llm_busy = False
+        self.latest_llm_score = 0.5   # fallback
 
 
     # =========================================================
@@ -124,7 +147,9 @@ class GameManager:
         self.elapsed_time = 0.0
         self.second_timer = 0.0
         self.spawn_timer = 4.0
-
+        self.difficulty_score = 0.5
+        self.target_difficulty = 0.5
+        
         self.spawn_interval = self.default_spawn_interval
         self.spawn_count = self.default_spawn_count
         self.enemy_speed_range = self.default_enemy_speed_range
@@ -134,7 +159,7 @@ class GameManager:
         self.max_enemy_speed_limit = self.default_max_enemy_speed
 
 
-        self.last_avg_enemy_distance = 0.0
+        self.last_avg_enemy_distance = self.max_spawn_dist
         self.prev_avg_enemy_distance = None
         self.avg_distance_history.clear()
 
@@ -142,6 +167,8 @@ class GameManager:
         self.current_enemy_count = 0
         self.enemy_count_delta = 0
         self.kill_count = 0
+        self.logger
+        
 
 
     def tick(self, dt: float, player: Character, enemies: List[Enemy], current_terrain: str, world_objects=None):
@@ -179,21 +206,86 @@ class GameManager:
             return
 
         self.second_timer -= 1.0
-
-        if self.shield_radius is None:
-            self.shield_radius = player.shield_radius
-    
+        
+        
+        normalized_state = self.get_normalized_state(
+            player.shield_segments,
+            player.max_shield_segments
+        )
+        self.metric_history.append(normalized_state)
+        
+        # 1. measure
         self._sample_avg_enemy_distance(player, enemies)
-    
-        self._adjust_enemy_speed_from_distance()
+        avg_dist = self.last_avg_enemy_distance
+
+        far_threshold = self.min_spawn_dist * 1.5
+        close_threshold = self.min_spawn_dist  # (you said "min spawn rate" but this should be distance)
+
+
+        # FAR STATE
+        if avg_dist > far_threshold:
+            self.far_time += 1.0
+        else:
+            self.far_time = 0.0
+
+        # CLOSE STATE
+        if avg_dist < close_threshold:
+            self.close_time += 1.0
+        else:
+            self.close_time = 0.0
+
+        # 2. compute difficulty
+        metric_factor = self._update_difficulty_from_metrics(player, normalized_state)
+        if self.time_goal > 0:
+            time_factor = self._update_difficulty_from_time() 
+            metric_factor = 0.7 * metric_factor + 0.3 * time_factor
+        else:
+            metric_factor = metric_factor
+        
+        self.target_difficulty = metric_factor
+        print(f"Rule_based difficulty: {metric_factor:.3f}")
+        if self.player_profile["agent_dda"] == "LLM ON":
+            # Only request if previous one finished
+            if not self.llm_busy and len(self.metric_history) > 0:
+                history_to_send = self.metric_history.copy()
+
+                self.metric_history.clear()
+
+                self._request_llm_async(history_to_send)
+            self.target_difficulty = self.latest_llm_score
+            print(f"LLM difficulty: {self.latest_llm_score:.3f}")
+        # Always use latest available result
+        # your final system (example hybrid)
+        
+        self.difficulty_score = self.target_difficulty
+        # self.difficulty_score += (self.target_difficulty - self.difficulty_score) * 0.3
+        self.difficulty_score = max(0.0, min(1.0, self.difficulty_score))
+
+        # 4. APPLY difficulty
+        self._apply_difficulty_to_enemy_speed()
+        self._apply_difficulty_to_spawning()
+        
+        # 🔥 LOG EVERYTHING
+        self.logger.log({
+            "time": self.elapsed_time,
+            "llm_score": self.latest_llm_score,
+            "system_score": metric_factor,
+            "target_difficulty": self.target_difficulty,
+            "final_difficulty": self.difficulty_score
+        })
+        
+        # 5. commentary (after everything updated)
         self.commentator.update({
             "avg_enemy_distance": self.last_avg_enemy_distance,
-            "enemy_speed": self.max_enemy_speed_limit,
+            "enemy_speed": self.enemy_speed_range[1],
             "spawn_count": self.spawn_count,
             "current_terrain": current_terrain,
             "lives_left": self.lives,
+            "time_elapsed": self.elapsed_time,
+            "time_goal": self.time_goal,
+            "difficulty_score": self.difficulty_score,
         })
-
+        
     def _sample_avg_enemy_distance(self, player: Character, enemies: List[Enemy]):
         if not enemies:
             avg = 0.0
@@ -208,46 +300,6 @@ class GameManager:
         if len(self.avg_distance_history) > self.max_history_len:
             self.avg_distance_history.pop(0)
 
-    # =========================================================
-    # Enemy speed control
-    # =========================================================
-
-    def _adjust_enemy_speed_from_distance(self):
-        curr = self.last_avg_enemy_distance
-
-        if self.prev_avg_enemy_distance is None:
-            self.prev_avg_enemy_distance = curr
-            return
-
-        delta = curr - self.prev_avg_enemy_distance
-        speed_changed = False
-
-        # rate-of-change
-        if delta > self.shield_radius:
-            self._scale_enemy_speed(1.1)
-            speed_changed = True
-        elif delta < -self.shield_radius:
-            self._scale_enemy_speed(1 / 1.1)
-            speed_changed = True
-
-        # absolute distance
-        if not speed_changed:
-            if curr > self.max_spawn_dist:
-                self._scale_enemy_speed(1.1)
-            elif curr < self.min_spawn_dist:
-                self._scale_enemy_speed(1 / 1.1)
-
-        self.prev_avg_enemy_distance = curr
-
-    def _scale_enemy_speed(self, factor: float):
-        min_s, max_s = self.enemy_speed_range
-
-        min_s = max(self.min_enemy_speed_limit,
-                    min(min_s * factor, self.max_enemy_speed_limit))
-        max_s = max(self.min_enemy_speed_limit,
-                    min(max_s * factor, self.max_enemy_speed_limit))
-
-        self.enemy_speed_range = (min_s, max_s)
 
     # =========================================================
     # Spawn logic
@@ -260,49 +312,14 @@ class GameManager:
 
         self.spawn_timer -= self.spawn_interval
 
-        # track enemy count before spawning
         self.current_enemy_count = len(enemies)
-        self.enemy_count_delta = (
-            self.current_enemy_count - self.last_spawn_enemy_count
-        )
-
-        # baseline reversion
-        self._revert_towards_default()
-
-        ideal_delta = -self.spawn_interval / 2.0
-
-        if self.enemy_count_delta < ideal_delta:
-            if self.spawn_count < self.max_spawn_count:
-                self.spawn_count += 1
-            else:
-                self.spawn_interval *= 0.9
-
-        elif self.enemy_count_delta > ideal_delta:
-            if self.spawn_count > self.min_spawn_count:
-                self.spawn_count -= 1
-            else:
-                self.spawn_interval *= 1.1
-
-        self.spawn_interval = max(
-            self.min_spawn_interval,
-            min(self.spawn_interval, self.max_spawn_interval),
-        )
+        self.enemy_count_delta = self.current_enemy_count - self.last_spawn_enemy_count
 
         for _ in range(self.spawn_count):
             enemies.append(self._spawn_enemy(player.pos, world_objects))
 
         self.last_spawn_enemy_count = len(enemies)
 
-    def _revert_towards_default(self):
-        if self.spawn_count > self.default_spawn_count:
-            self.spawn_count -= 1
-        elif self.spawn_count < self.default_spawn_count:
-            self.spawn_count += 1
-
-        if self.spawn_interval > self.default_spawn_interval:
-            self.spawn_interval *= 0.95
-        elif self.spawn_interval < self.default_spawn_interval:
-            self.spawn_interval *= 1.05
 
     # =========================================================
     # Death & helpers
@@ -460,4 +477,206 @@ class GameManager:
             player.pos.y + math.sin(angle) * dist,
         )
 
-        world_objects.spawn_collectible(pos)
+        world_objects.spawn_collectible(
+            pos,
+            difficulty_score=self.difficulty_score
+        )
+        
+    def _adjust_multipliers_based_on_mood(self):
+        if self.player_profile: 
+            match self.player_profile["mood"]:
+                case "Chill":
+                    self.multipliers = map(lambda x: x * 0.8, self.multipliers)
+                case "Neutral":
+                    pass
+                case "Focused":
+                    self.multipliers = map(lambda x: x * 1.2, self.multipliers)
+    
+    def _update_difficulty_from_metrics(self, player: Character, state):
+        self._adjust_multipliers_based_on_mood()
+
+        # -----------------------------
+        # NORMALIZED INPUTS (reuse LLM state)
+        # -----------------------------
+        health = state["player_state"]["health_pressure"]
+        kill_rate = state["player_state"]["kill_pressure"]
+        shield = state["player_state"]["shield_pressure"]
+
+        density = state["environment_state"]["enemy_density"]
+        safety = state["environment_state"]["distance_pressure"]
+
+        close = state["environment_state"]["distance_state"]["close_score"]
+
+        # -----------------------------
+        # INTERPRETATION (VERY IMPORTANT)
+        # -----------------------------
+        # High values = player doing well → increase difficulty
+
+        player_skill = (
+            0.4 * kill_rate +
+            0.3 * health +
+            0.3 * shield
+        )
+
+        control_state = (
+            0.5 * safety +   # far = safe
+            0.5 * (1 - density)  # fewer enemies = safe
+        )
+
+        # behavioral signals (time-based)
+        positioning = (
+            0.6 * (1 - safety) +      # player escaping → too easy
+            0.4 * (1 - close)  # not under pressure
+        )
+
+        # -----------------------------
+        # FINAL METRIC SCORE
+        # -----------------------------
+        score = (
+            0.5 * player_skill +
+            0.3 * control_state +
+            0.2 * positioning
+        )
+
+        # clamp to [0,1]
+        return max(0.0, min(1.0, score))
+    
+    def _update_difficulty_from_time(self):
+        if self.time_goal <= 0:
+            return 0.0  # infinite mode
+
+        progress = min(1.0, self.elapsed_time / self.time_goal)
+
+        # nonlinear ramp (feels better than linear)
+        return progress ** 2
+
+    def _apply_difficulty_to_enemy_speed(self):
+        base_min, base_max = self.default_enemy_speed_range
+
+        factor = 0.5 + self.difficulty_score  # range ~[0.5 → 1.5]
+
+        min_s = base_min * factor
+        max_s = base_max * factor
+
+        min_s = max(self.min_enemy_speed_limit, min(min_s, self.max_enemy_speed_limit))
+        max_s = max(self.min_enemy_speed_limit, min(max_s, self.max_enemy_speed_limit))
+
+        self.enemy_speed_range = (min_s, max_s)
+        
+    def _apply_difficulty_to_spawning(self):
+        # more difficulty → more enemies, faster spawn
+        self.spawn_count = int(
+            self.default_spawn_count +
+            self.difficulty_score * self.max_spawn_count
+        )      
+        self.spawn_interval = max(
+            self.min_spawn_interval,
+            self.default_spawn_interval * (1.2 - self.difficulty_score)
+        )
+     
+    def get_normalized_state(self, shield_segments=None, max_shield_segments=None):
+        # -----------------------------
+        # Time (harder as time progresses)
+        # -----------------------------
+        if self.time_goal > 0:
+            time_progress = min(1.0, self.elapsed_time / self.time_goal)
+        else:
+            time_progress = 0.0
+
+        # -----------------------------
+        # Player state (invert → pressure)
+        # -----------------------------
+        health_ratio = self.lives / self.initial_lives
+        health_pressure = 1.0 - health_ratio
+
+        if shield_segments is not None:
+            shield_ratio = shield_segments / max_shield_segments
+        else:
+            shield_ratio = 0.5
+
+        shield_pressure = 1.0 - shield_ratio
+
+        # -----------------------------
+        # Kill rate (invert → struggling)
+        # -----------------------------
+        raw_kill_rate = self.kill_count / (self.elapsed_time + 1e-5)
+        kill_rate_norm = min(1.0, raw_kill_rate / 3.0)
+        kill_pressure = 1.0 - kill_rate_norm
+
+        # -----------------------------
+        # Enemy density (more = harder)
+        # -----------------------------
+        enemy_density = min(1.0, self.current_enemy_count / 20)
+
+        # -----------------------------
+        # Distance (closer = harder)
+        # -----------------------------
+        min_dist = self.min_spawn_dist * 1.3
+        distance_pressure = max(
+            0.0,
+            1.0 - min(1.0, self.last_avg_enemy_distance / min_dist)
+        )
+
+        # -----------------------------
+        # Distance trend (KEEP AS IS)
+        # -----------------------------
+        MAX_TIME = 15
+
+        close_score = min(1.0, self.close_time / MAX_TIME)  # close → hard
+
+        # -----------------------------
+        # Overall pressure (aggregated signal)
+        # -----------------------------
+        overall_pressure = (
+            0.25 * health_pressure +
+            0.10 * kill_pressure +
+            0.05 * shield_pressure +
+            0.30 * enemy_density +
+            0.30 * distance_pressure
+        )
+        
+        # -----------------------------
+        # Clamp
+        # -----------------------------
+        def clamp(x):
+            return max(0.0, min(1.0, x))
+
+        normalized = {
+            "current_difficulty": clamp(self.difficulty_score),
+            "time_pressure": clamp(time_progress),
+
+            "player_state": {
+                "health_pressure": clamp(health_pressure),
+                "kill_pressure": clamp(kill_pressure),
+                "shield_pressure": clamp(shield_pressure)
+            },
+
+            "environment_state": {
+                "enemy_density": clamp(enemy_density),
+                "distance_pressure": clamp(distance_pressure),
+
+                "distance_state": {
+                    "close_score": clamp(close_score)  # high = hard
+                }
+            },
+            "overall": {
+                "pressure": clamp(overall_pressure)
+            }
+        }
+
+        return normalized
+
+    def _request_llm_async(self, normalized_state):
+        def worker():
+            try:
+                result = generate_difficulty_score_with_request(normalized_state)
+                if isinstance(result, float):
+                    self.latest_llm_score = result
+            except Exception as e:
+                print("LLM async error:", e)
+            finally:
+                self.llm_busy = False
+
+        self.llm_busy = True
+        self.llm_thread = threading.Thread(target=worker, daemon=True)
+        self.llm_thread.start()

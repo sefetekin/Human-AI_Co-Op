@@ -1,5 +1,6 @@
 import math
 import random
+import time
 import pygame
 from pygame.math import Vector2
 from typing import List
@@ -93,6 +94,11 @@ game_manager = GameManager(
         config.enemy_min_speed,
         config.enemy_max_speed,
     ),
+    max_spawn_count=config.max_spawn_count,
+    min_spawn_count=config.min_spawn_count,
+    max_spawn_interval=config.max_spawn_interval,
+    min_spawn_interval=config.min_spawn_interval,
+    multipliers=config.multipliers
 )
 
 hud_renderer = HUDRenderer(SCREEN_SIZE)
@@ -136,7 +142,7 @@ while running:
 
             if setup_ui.start_requested:
                 game_manager.player_profile = setup_ui.get_profile()
-                
+                game_manager.time_goal = game_manager.player_profile["time_goal"]
                 game_manager.commentator = CommentaryManager(
                     traits=game_manager.player_profile,
                     llm_func="request",
@@ -223,7 +229,8 @@ while running:
                 time_survived=final_time,
                 kills=game_manager.kill_count,
             )
-
+            game_manager.logger.save()
+            
     
 
 
@@ -244,6 +251,7 @@ while running:
             current_entry = None
 
             game_manager.reset()
+            world_renderer.world_objects.collectibles.clear()
             game_manager.state = GameState.PLAYING
 
         elif selected == "New Player":
@@ -256,6 +264,7 @@ while running:
 
             setup_ui.reset()
             game_manager.reset()
+            world_renderer.world_objects.collectibles.clear()
             game_manager.state = GameState.PLAYER_SETUP
 
         elif selected == "Scoreboard":
@@ -309,4 +318,10 @@ while running:
 
     pygame.display.flip()
 
-pygame.quit()
+    game_manager.logger.save()
+    if not running:
+        pygame.quit()
+        game_manager.logger.create_graph()
+        
+    
+

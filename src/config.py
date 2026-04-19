@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -24,6 +24,10 @@ class GameConfig:
     spawn_count: int = 5
     enemy_min_spawn_dist: float = 150.0
     enemy_max_spawn_dist: float = 600.0
+    max_spawn_count: int = 10
+    min_spawn_count: int = 3
+    max_spawn_interval: float = 10.0
+    min_spawn_interval: float = 2.0
 
     # --- lives ---
     initial_lives: int = 2
@@ -33,3 +37,10 @@ class GameConfig:
     collectible_spawn_max: float = 12.0
     collectible_spawn_distance_min: float = 80.0
     collectible_spawn_distance_max: float = 300.0
+    
+    # --- difficulty multipliers ---
+    multipliers: dict = field(default_factory=lambda: {
+            "avg_enemy_distance_multiplier": 1.0,
+            "kill_rate_multiplier": 0.2,
+            "spawn_kill_multiplier": 1.0,
+        })

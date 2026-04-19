@@ -69,6 +69,11 @@ class HUDRenderer:
         screen.blit(label, (20, 60))
 
         setup_ui.caption_buttons.draw(screen, self.font_small)
+        
+        label = self.font_small.render("Agent_Based DDA", True, (200, 200, 200))
+        screen.blit(label, (20, 120))
+
+        setup_ui.caption_buttons.draw(screen, self.font_small)
 
         
         # ---------- Title ----------
@@ -85,6 +90,7 @@ class HUDRenderer:
         draw_label("Mood *",          setup_ui.mood_label_y)
         draw_label("Likes",           setup_ui.likes_label_y)
         draw_label("Background Object", setup_ui.background_label_y)
+        draw_label("Time Goal", setup_ui.time_goal_label_y)
 
 
         # ---------- Widgets ----------
@@ -94,6 +100,8 @@ class HUDRenderer:
         setup_ui.likes_input.draw(screen, self.font_small)
         setup_ui.background_buttons.draw(screen, self.font_small)
         setup_ui.background_input.draw(screen, self.font_small)
+        setup_ui.time_goal_input.draw(screen, self.font_small)
+        setup_ui.agent_buttons.draw(screen, self.font_small)
 
         # ---------- Start ----------
         self._draw_start_button(
@@ -223,24 +231,20 @@ class HUDRenderer:
         y = self.screen_h // 2 - 120
         line_h = 22
 
-        min_speed, max_speed = game_manager.enemy_speed_range
-        delta = game_manager.enemy_count_delta
+        metrics = game_manager.metric_history[-1] if len(game_manager.metric_history) > 0 else None
 
-        delta_color = (220, 220, 220)
-        if delta > 0:
-            delta_color = (120, 240, 120)
-        elif delta < 0:
-            delta_color = (240, 120, 120)
-
-        lines = [
-            ("Spawn Count", f"{game_manager.spawn_count}", (220, 220, 220)),
-            ("Spawn Interval", f"{game_manager.spawn_interval:.2f}s", (220, 220, 220)),
-            ("Shield Count", f"{player.shield_segments}", (220, 220, 220)),
-            ("Avg Distance", f"{game_manager.last_avg_enemy_distance:.1f}", (220, 220, 220)),
-            ("Enemy Δ", f"{delta}", delta_color),
-            ("Enemy Min Speed", f"{min_speed:.1f}", (220, 220, 220)),
-            ("Enemy Max Speed", f"{max_speed:.1f}", (220, 220, 220)),
-        ]
+        def go_through_metrics(metrics):
+            lines = []
+            for metric in metrics:
+                if isinstance(metrics[metric], (int, float)):
+                    lines.append((metric, f"{metrics[metric]:.2f}", (220, 220, 220)))
+                else:
+                    lines.extend(go_through_metrics(metrics[metric]))
+            return lines
+        if metrics:
+            lines = go_through_metrics(metrics)
+        else:
+            return 
 
         panel_h = line_h * len(lines) + 10
         panel = pygame.Surface((215, panel_h), pygame.SRCALPHA)

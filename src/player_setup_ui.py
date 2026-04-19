@@ -24,12 +24,21 @@ class PlayerSetupUI:
 
         # default selection
         self.caption_buttons.selected = "Caption OFF"
+        
+        # ---------- Agent DDA toggle ----------
+        self.agent_buttons = SelectButtons([
+            ("LLM ON",  (20, 140, 90, 32)),
+            ("LLM OFF", (115, 140, 90, 32)),
+        ])
+
+        # default selection
+        self.agent_buttons.selected = "LLM OFF"
 
         # ---------- Layout constants ----------
         COLUMN_W = 360
-        FIELD_H = 36
+        FIELD_H = 24
         GAP = 14
-        SECTION_GAP = 28
+        SECTION_GAP = 24
 
         LEFT_X = (w - COLUMN_W) // 2
         y = 110   # top anchor for the form
@@ -55,9 +64,9 @@ class PlayerSetupUI:
         btn_h = FIELD_H
 
         self.age_group_buttons = SelectButtons([
-            ("<18",   (LEFT_X,               y, btn_w, btn_h)),
-            ("18–25", (LEFT_X + btn_w + 10,  y, btn_w, btn_h)),
-            (">25",   (LEFT_X + 2*(btn_w+10),y, btn_w, btn_h)),
+            ("18-30",   (LEFT_X,               y, btn_w, btn_h)),
+            ("30–50", (LEFT_X + btn_w + 10,  y, btn_w, btn_h)),
+            (">50",   (LEFT_X + 2*(btn_w+10),y, btn_w, btn_h)),
         ])
         y += FIELD_H + SECTION_GAP
 
@@ -67,8 +76,8 @@ class PlayerSetupUI:
 
         self.mood_buttons = SelectButtons([
             ("Chill",   (LEFT_X,               y, btn_w, btn_h)),
-            ("Focused", (LEFT_X + btn_w + 10,  y, btn_w, btn_h)),
-            ("Fun",     (LEFT_X + 2*(btn_w+10),y, btn_w, btn_h)),
+            ("Neutral", (LEFT_X + btn_w + 10,  y, btn_w, btn_h)),
+            ("Focused",     (LEFT_X + 2*(btn_w+10),y, btn_w, btn_h)),
         ])
         y += FIELD_H + SECTION_GAP
 
@@ -106,6 +115,17 @@ class PlayerSetupUI:
         )
 
         y += FIELD_H + SECTION_GAP
+        # ---------- Time Goal ----------
+        self.time_goal_label_y = y
+        y += GAP
+        self.time_goal_input = TextInput(
+            (LEFT_X, y, COLUMN_W, FIELD_H),
+            numeric=True,
+            max_len=4,
+            placeholder="Time goal (seconds, 0 = infinite)",
+        )
+        y += FIELD_H + SECTION_GAP
+        
         # ---------- Start ----------
         self.start_rect = pygame.Rect(
             LEFT_X,
@@ -128,6 +148,8 @@ class PlayerSetupUI:
         self.mood_buttons.handle_event(event)
         self.content_gen_buttons.handle_event(event)
         self.caption_buttons.handle_event(event)
+        self.time_goal_input.handle_event(event)
+        self.agent_buttons.handle_event(event)
 
         # --- determine generation state ---
         gen_on = self.content_gen_buttons.selected == "Gen ON"
@@ -167,6 +189,8 @@ class PlayerSetupUI:
         self.background_buttons.selected = None
         self.background_input.text = ""
         self.background_input.active = False
+        
+        self.time_goal_input.text = ""
 
     def is_valid(self):
         return (
@@ -183,6 +207,8 @@ class PlayerSetupUI:
             "content_generation": self.content_gen_buttons.selected,
             "captions": self.caption_buttons.selected,
             "background": self.get_background_objects(),
+            "time_goal": float(self.time_goal_input.text or 0),
+            "agent_dda": self.agent_buttons.selected,
         }
     
     def get_background_objects(self):
