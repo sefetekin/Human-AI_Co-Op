@@ -204,7 +204,3 @@ if __name__ == "__main__":
         ),
         radius=15,
     )
-    
-# rocky highland terrain
-# cliffside rocky terrain
-# swamp marsh terrain

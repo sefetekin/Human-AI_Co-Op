@@ -8,11 +8,11 @@ from character import Character
 import random
 import math
 import threading
+from collections import deque
 from assets import create_asset
-from comment_manager import CommentaryManager
 from loading_process import LoadingProgress
 from logger import DifficultyLogger
-from test import generate_difficulty_score_with_request
+from agentic_dda import generate_difficulty_score_with_request
 
 class GameState(Enum):
     PLAYER_SETUP = auto()
@@ -90,7 +90,7 @@ class GameManager:
         self.max_history_len = 5
         self.kill_count = 0
         self.enemy_count_delta = 0
-        self.metric_history: List[dict] = []
+        self.metric_history: deque[dict] = deque(maxlen=3)
         
         # ---------- difficulty system ----------
         self.difficulty_score = 0.5   # range [0, 1]
@@ -219,7 +219,7 @@ class GameManager:
         avg_dist = self.last_avg_enemy_distance
 
         far_threshold = self.min_spawn_dist * 1.5
-        close_threshold = self.min_spawn_dist  # (you said "min spawn rate" but this should be distance)
+        close_threshold = self.min_spawn_dist * 1.5 # (you said "min spawn rate" but this should be distance)
 
 
         # FAR STATE
@@ -243,7 +243,6 @@ class GameManager:
             metric_factor = metric_factor
         
         self.target_difficulty = metric_factor
-        print(f"Rule_based difficulty: {metric_factor:.3f}")
         if self.player_profile["agent_dda"] == "LLM ON":
             # Only request if previous one finished
             if not self.llm_busy and len(self.metric_history) > 0:
@@ -253,7 +252,6 @@ class GameManager:
 
                 self._request_llm_async(history_to_send)
             self.target_difficulty = self.latest_llm_score
-            print(f"LLM difficulty: {self.latest_llm_score:.3f}")
         # Always use latest available result
         # your final system (example hybrid)
         
@@ -600,18 +598,18 @@ class GameManager:
         # Kill rate (invert → struggling)
         # -----------------------------
         raw_kill_rate = self.kill_count / (self.elapsed_time + 1e-5)
-        kill_rate_norm = min(1.0, raw_kill_rate / 3.0)
+        kill_rate_norm = min(1.0, raw_kill_rate / 1.0)
         kill_pressure = 1.0 - kill_rate_norm
 
         # -----------------------------
         # Enemy density (more = harder)
         # -----------------------------
-        enemy_density = min(1.0, self.current_enemy_count / 20)
+        enemy_density = min(1.0, self.current_enemy_count / 40)
 
         # -----------------------------
         # Distance (closer = harder)
         # -----------------------------
-        min_dist = self.min_spawn_dist * 1.3
+        min_dist = self.min_spawn_dist * 2.5
         distance_pressure = max(
             0.0,
             1.0 - min(1.0, self.last_avg_enemy_distance / min_dist)
@@ -620,7 +618,7 @@ class GameManager:
         # -----------------------------
         # Distance trend (KEEP AS IS)
         # -----------------------------
-        MAX_TIME = 15
+        MAX_TIME = 5
 
         close_score = min(1.0, self.close_time / MAX_TIME)  # close → hard
 
@@ -630,9 +628,9 @@ class GameManager:
         overall_pressure = (
             0.25 * health_pressure +
             0.10 * kill_pressure +
-            0.05 * shield_pressure +
-            0.30 * enemy_density +
-            0.30 * distance_pressure
+            0.15 * shield_pressure +
+            0.40 * enemy_density +
+            0.10 * distance_pressure
         )
         
         # -----------------------------

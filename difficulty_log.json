@@ -1,1 +1,219 @@
-[]
+[
+  {
+    "time": 1.0140000000000007,
+    "llm_score": 0.5,
+    "system_score": 0.55,
+    "target_difficulty": 0.5,
+    "final_difficulty": 0.5
+  },
+  {
+    "time": 2.0029999999999957,
+    "llm_score": 0.5,
+    "system_score": 0.5640000000000001,
+    "target_difficulty": 0.5,
+    "final_difficulty": 0.5
+  },
+  {
+    "time": 3.014999999999991,
+    "llm_score": 0.5,
+    "system_score": 0.48698661298038026,
+    "target_difficulty": 0.5,
+    "final_difficulty": 0.5
+  },
+  {
+    "time": 4.012999999999986,
+    "llm_score": 0.5,
+    "system_score": 0.5026651428865656,
+    "target_difficulty": 0.5,
+    "final_difficulty": 0.5
+  },
+  {
+    "time": 5.015000000000005,
+    "llm_score": 0.5,
+    "system_score": 0.4772113794463064,
+    "target_difficulty": 0.5,
+    "final_difficulty": 0.5
+  },
+  {
+    "time": 6.013000000000022,
+    "llm_score": 0.5,
+    "system_score": 0.4388331250861627,
+    "target_difficulty": 0.5,
+    "final_difficulty": 0.5
+  },
+  {
+    "time": 7.011000000000041,
+    "llm_score": 0.5,
+    "system_score": 0.3671617637111375,
+    "target_difficulty": 0.5,
+    "final_difficulty": 0.5
+  },
+  {
+    "time": 8.009000000000059,
+    "llm_score": 0.65,
+    "system_score": 0.36199654105592594,
+    "target_difficulty": 0.65,
+    "final_difficulty": 0.65
+  },
+  {
+    "time": 9.01200000000003,
+    "llm_score": 0.65,
+    "system_score": 0.377321745481625,
+    "target_difficulty": 0.65,
+    "final_difficulty": 0.65
+  },
+  {
+    "time": 10.013000000000007,
+    "llm_score": 0.65,
+    "system_score": 0.3674739048649059,
+    "target_difficulty": 0.65,
+    "final_difficulty": 0.65
+  },
+  {
+    "time": 11.01199999999998,
+    "llm_score": 0.65,
+    "system_score": 0.3487564557945253,
+    "target_difficulty": 0.65,
+    "final_difficulty": 0.65
+  },
+  {
+    "time": 12.007999999999951,
+    "llm_score": 0.65,
+    "system_score": 0.3329256135023616,
+    "target_difficulty": 0.65,
+    "final_difficulty": 0.65
+  },
+  {
+    "time": 13.01199999999992,
+    "llm_score": 0.65,
+    "system_score": 0.3029107922200917,
+    "target_difficulty": 0.65,
+    "final_difficulty": 0.65
+  },
+  {
+    "time": 14.006999999999895,
+    "llm_score": 0.65,
+    "system_score": 0.36361792752850747,
+    "target_difficulty": 0.65,
+    "final_difficulty": 0.65
+  },
+  {
+    "time": 15.003999999999866,
+    "llm_score": 0.65,
+    "system_score": 0.4028439480550478,
+    "target_difficulty": 0.65,
+    "final_difficulty": 0.65
+  },
+  {
+    "time": 16.005999999999837,
+    "llm_score": 0.65,
+    "system_score": 0.4040082823983107,
+    "target_difficulty": 0.65,
+    "final_difficulty": 0.65
+  },
+  {
+    "time": 17.006999999999802,
+    "llm_score": 0.65,
+    "system_score": 0.4045606397125465,
+    "target_difficulty": 0.65,
+    "final_difficulty": 0.65
+  },
+  {
+    "time": 18.005999999999766,
+    "llm_score": 0.65,
+    "system_score": 0.3993055512395572,
+    "target_difficulty": 0.65,
+    "final_difficulty": 0.65
+  },
+  {
+    "time": 19.002999999999727,
+    "llm_score": 0.65,
+    "system_score": 0.3988759035063092,
+    "target_difficulty": 0.65,
+    "final_difficulty": 0.65
+  },
+  {
+    "time": 20.00199999999969,
+    "llm_score": 0.55,
+    "system_score": 0.39765527856791616,
+    "target_difficulty": 0.55,
+    "final_difficulty": 0.55
+  },
+  {
+    "time": 21.00599999999966,
+    "llm_score": 0.55,
+    "system_score": 0.3991620414425795,
+    "target_difficulty": 0.55,
+    "final_difficulty": 0.55
+  },
+  {
+    "time": 21.999999999999616,
+    "llm_score": 0.55,
+    "system_score": 0.3923513707698859,
+    "target_difficulty": 0.55,
+    "final_difficulty": 0.55
+  },
+  {
+    "time": 23.012999999999575,
+    "llm_score": 0.55,
+    "system_score": 0.4063496616047294,
+    "target_difficulty": 0.55,
+    "final_difficulty": 0.55
+  },
+  {
+    "time": 23.999999999999545,
+    "llm_score": 0.55,
+    "system_score": 0.3923442168945968,
+    "target_difficulty": 0.55,
+    "final_difficulty": 0.55
+  },
+  {
+    "time": 25.011999999999503,
+    "llm_score": 0.55,
+    "system_score": 0.3767318772177872,
+    "target_difficulty": 0.55,
+    "final_difficulty": 0.55
+  },
+  {
+    "time": 26.01299999999947,
+    "llm_score": 0.55,
+    "system_score": 0.3611193849515288,
+    "target_difficulty": 0.55,
+    "final_difficulty": 0.55
+  },
+  {
+    "time": 27.00999999999943,
+    "llm_score": 0.55,
+    "system_score": 0.35856625123539065,
+    "target_difficulty": 0.55,
+    "final_difficulty": 0.55
+  },
+  {
+    "time": 28.008999999999393,
+    "llm_score": 0.55,
+    "system_score": 0.4165646465376212,
+    "target_difficulty": 0.55,
+    "final_difficulty": 0.55
+  },
+  {
+    "time": 29.007999999999356,
+    "llm_score": 0.55,
+    "system_score": 0.40531889271530136,
+    "target_difficulty": 0.55,
+    "final_difficulty": 0.55
+  },
+  {
+    "time": 30.00799999999932,
+    "llm_score": 0.55,
+    "system_score": 0.4176105257827073,
+    "target_difficulty": 0.55,
+    "final_difficulty": 0.55
+  },
+  {
+    "time": 31.006999999999284,
+    "llm_score": 0.55,
+    "system_score": 0.41269591114190374,
+    "target_difficulty": 0.55,
+    "final_difficulty": 0.55
+  }
+]

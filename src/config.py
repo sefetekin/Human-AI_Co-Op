@@ -20,14 +20,14 @@ class GameConfig:
 
     # --- spawning ---
     initial_enemy_count: int = 6
-    spawn_interval: float = 5.0
+    spawn_interval: float = 7.0
     spawn_count: int = 5
-    enemy_min_spawn_dist: float = 150.0
+    enemy_min_spawn_dist: float = 200.0
     enemy_max_spawn_dist: float = 600.0
-    max_spawn_count: int = 10
+    max_spawn_count: int = 7
     min_spawn_count: int = 3
     max_spawn_interval: float = 10.0
-    min_spawn_interval: float = 2.0
+    min_spawn_interval: float = 3.0
 
     # --- lives ---
     initial_lives: int = 2

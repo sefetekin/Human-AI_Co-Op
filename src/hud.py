@@ -235,23 +235,34 @@ class HUDRenderer:
 
         def go_through_metrics(metrics):
             lines = []
-            for metric in metrics:
-                if isinstance(metrics[metric], (int, float)):
-                    lines.append((metric, f"{metrics[metric]:.2f}", (220, 220, 220)))
-                else:
-                    lines.extend(go_through_metrics(metrics[metric]))
+            for metric, val in metrics.items():
+                if isinstance(val, (int, float)):
+                    # Determine color based on normalized value
+                    if val < 0.3:
+                        color = (100, 255, 100)  # Green
+                    elif val < 0.6:
+                        color = (255, 255, 100)  # Yellow
+                    else:
+                        color = (255, 100, 100)  # Red
+                    
+                    lines.append((metric, f"{val:.2f}", color))
+                elif isinstance(val, dict):
+                    lines.extend(go_through_metrics(val))
             return lines
+
         if metrics:
             lines = go_through_metrics(metrics)
         else:
             return 
 
+        # Drawing logic remains the same
         panel_h = line_h * len(lines) + 10
         panel = pygame.Surface((215, panel_h), pygame.SRCALPHA)
         panel.fill((0, 0, 0, 140))
         screen.blit(panel, (x - 10, y - 5))
 
         for i, (label, value, color) in enumerate(lines):
+            # Using the dynamic color determined in the loop above
             surf = self.font_small.render(f"{label}: {value}", True, color)
             screen.blit(surf, (x, y + i * line_h))
             
