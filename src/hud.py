@@ -1,5 +1,4 @@
 import pygame
-from yfinance import screen
 from game_manager import GameState
 from ui.select_buttons import SelectButtons
 
@@ -46,6 +45,7 @@ class HUDRenderer:
 
 
         self._draw_debug_panel(screen, game_manager, player)
+        self._draw_output_panel(screen, game_manager, player)
         self.draw_commentary(
             screen,
             game_manager.commentator.get_line()
@@ -265,7 +265,45 @@ class HUDRenderer:
             # Using the dynamic color determined in the loop above
             surf = self.font_small.render(f"{label}: {value}", True, color)
             screen.blit(surf, (x, y + i * line_h))
-            
+    def _draw_output_panel(self, screen, game_manager, player):
+        panel_width = 215
+        margin = 15
+        x = margin
+        y = self.screen_h // 2 - 120
+        line_h = 22
+
+        metrics = game_manager.metric_history[-1] if len(game_manager.metric_history) > 0 else None
+        metrics = {
+            "enemy_speed_min (default: 50)": game_manager.enemy_speed_range[0],
+            "enemy_speed_max (default: 100)": game_manager.enemy_speed_range[1],
+            "enemy_spawn_count (default: 5)": game_manager.spawn_count,
+            "enemy_spawn_interval (default: 7.0)": game_manager.spawn_interval,
+        }
+        def go_through_metrics(metrics):
+            lines = []
+            for metric in metrics:
+                if isinstance(metrics[metric], (int, float)):
+                    lines.append((metric, f"{metrics[metric]:.2f}", (220, 220, 220)))
+                else:
+                    lines.extend(go_through_metrics(metrics[metric]))
+            return lines
+        if metrics:
+            lines = go_through_metrics(metrics)
+        else:
+            return 
+        
+        lines.insert(0, ("OUTPUT PANEL", "", (220, 220, 220)))
+        panel_h = line_h * len(lines) + 10
+        panel = pygame.Surface((310, panel_h), pygame.SRCALPHA)
+        panel.fill((0, 0, 0, 140))
+        screen.blit(panel, (x - 10, y - 5))
+
+        for i, (label, value, color) in enumerate(lines):
+            surf = self.font_small.render(f"{label}: {value}", True, color)
+            screen.blit(surf, (x, y + i * line_h))
+
+       
+    
     def handle_event(self, event, game_manager):
         if game_manager.state == GameState.GAME_OVER:
             self.game_over_buttons.handle_event(event)

@@ -1,5 +1,6 @@
 from enum import Enum, auto
 import time
+import json
 from typing import List
 from pathlib import Path
 from pygame.math import Vector2
@@ -167,7 +168,7 @@ class GameManager:
         self.current_enemy_count = 0
         self.enemy_count_delta = 0
         self.kill_count = 0
-        self.logger
+        self.metric_history.clear()
         
 
 
@@ -212,6 +213,7 @@ class GameManager:
             player.shield_segments,
             player.max_shield_segments
         )
+        
         self.metric_history.append(normalized_state)
         
         # 1. measure
@@ -247,10 +249,11 @@ class GameManager:
             # Only request if previous one finished
             if not self.llm_busy and len(self.metric_history) > 0:
                 history_to_send = self.metric_history.copy()
-
+                history_to_send.append(self.player_profile["mood"])  # include latest state
                 self.metric_history.clear()
 
                 self._request_llm_async(history_to_send)
+                history_to_send.pop()
             self.target_difficulty = self.latest_llm_score
         # Always use latest available result
         # your final system (example hybrid)

@@ -1,8 +1,10 @@
+import json
+
 import requests
 import re
 
 def generate_difficulty_score_with_request(game_state, model="gemma3:4b", temperature=0.1, max_tokens=5):
-
+    mood = game_state.pop()
     system_prompt = """
 You are a High-Performance Game Difficulty Controller.
 
@@ -14,14 +16,14 @@ Scale Calibration:
 - 1.0: Peak Challenge (Player is dominating/flawless)
 
 Operational Logic:
-1. High Pressure (Health/Shield/Death risk > 0.6): You are a "Supporter." Aggressively drop difficulty to prevent player burnout.
-2. Low Pressure (Health/Shield/Death risk < 0.15): You are an "Adversary." Aggressively increase difficulty to prevent player boredom.
+1. High Pressure (a few > 0.4 or one > 0.7): You are a "Supporter." Aggressively drop difficulty to prevent player burnout.
+2. Low Pressure (a few < 0.1): You are an "Adversary." Aggressively increase difficulty to prevent player boredom.
 3. Trends: If pressure is decreasing over the history, you must increase difficulty to catch up to the player's rising skill.
 
 Return ONLY the number.
 """
     user_prompt = f"""
-Update the game difficulty based on the following state history:
+Update the game difficulty for a {mood} player based on the following state history:
 
 [INPUT DATA]
 {game_state}
@@ -57,6 +59,10 @@ Output ONLY the floating-point number.
             "num_predict": max_tokens
         }
     }
+    
+    with open("example_llm_dialogue.txt", "a") as f:
+        f.write("\n=== Payload Sent to LLM with Normalized State ===\n")
+        json.dump(payload, f, indent=4)  # Debug: Print the payload being sent to the LLM
 
     try:
         response = requests.post(
@@ -66,6 +72,9 @@ Output ONLY the floating-point number.
         )
         response.raise_for_status()
         data = response.json()
+        with open("example_llm_dialogue.txt", "a") as f:
+            f.write("\n=== LLM Response ===\n")
+            json.dump(data, f, indent=4)
         raw = data["message"]["content"].strip()
 
         match = re.search(r"[-+]?\d*\.?\d+", raw)
