@@ -321,7 +321,7 @@ while running:
     game_manager.logger.save()
     if not running:
         pygame.quit()
-        game_manager.logger.create_graph()
+        #game_manager.logger.create_graph()
         
     
 

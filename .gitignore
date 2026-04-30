@@ -4,3 +4,4 @@ models/
 .env
 TODO.md
 test.py
+difficulty_log.json
