@@ -197,10 +197,10 @@ if __name__ == "__main__":
         template_path=Path(f"templates/dirt_with_stones.png"),
         prompt_override=(
             f"a 2D 128x128 Pixel Art game background representing "
-            f"desert texture from top-down (bird's eye) view"
+            f"toy car texture from top-down (bird's eye) view"
         ),
         output_path=Path(
-            f"outputs/desert_test_1.png"
+            f"outputs/fyp_test.png"
         ),
         radius=15,
     )

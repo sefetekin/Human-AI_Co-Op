@@ -98,7 +98,6 @@ game_manager = GameManager(
     min_spawn_count=config.min_spawn_count,
     max_spawn_interval=config.max_spawn_interval,
     min_spawn_interval=config.min_spawn_interval,
-    multipliers=config.multipliers
 )
 
 hud_renderer = HUDRenderer(SCREEN_SIZE)

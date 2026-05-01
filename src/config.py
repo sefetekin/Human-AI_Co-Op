@@ -37,10 +37,3 @@ class GameConfig:
     collectible_spawn_max: float = 12.0
     collectible_spawn_distance_min: float = 80.0
     collectible_spawn_distance_max: float = 300.0
-    
-    # --- difficulty multipliers ---
-    multipliers: dict = field(default_factory=lambda: {
-            "avg_enemy_distance_multiplier": 1.0,
-            "kill_rate_multiplier": 0.2,
-            "spawn_kill_multiplier": 1.0,
-        })

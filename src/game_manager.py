@@ -36,8 +36,7 @@ class GameManager:
         max_spawn_count: int,
         min_spawn_count: int,
         max_spawn_interval: float,
-        min_spawn_interval: float,
-        multipliers: dict[str, float]
+        min_spawn_interval: float
     ):
         # ---------- game state ----------
         self.state = GameState.PLAYER_SETUP
@@ -80,7 +79,6 @@ class GameManager:
         self.min_spawn_interval = min_spawn_interval
         self.max_spawn_interval = max_spawn_interval
         
-        self.multipliers = multipliers
 
         
 
@@ -235,14 +233,9 @@ class GameManager:
             self.close_time += 1.0
         else:
             self.close_time = 0.0
-
+        
         # 2. compute difficulty
-        metric_factor = self._update_difficulty_from_metrics(player, normalized_state)
-        if self.time_goal > 0:
-            time_factor = self._update_difficulty_from_time() 
-            metric_factor = 0.7 * metric_factor + 0.3 * time_factor
-        else:
-            metric_factor = metric_factor
+        metric_factor = self._update_difficulty_from_metrics(self.difficulty_score, normalized_state)
         
         self.target_difficulty = metric_factor
         if self.player_profile["agent_dda"] == "LLM ON":
@@ -398,9 +391,10 @@ class GameManager:
             "dirt_with_stones": "small",
         }
         inputted_types = self.player_profile["background"]
-        for t in inputted_types:
-            if t not in terrain_types:
-                terrain_types[t] = f"a ground full of {t}"
+        if inputted_types:
+            terrain_types = {}
+            for t in inputted_types:
+                terrain_types[t] = f"area with {t}"
         total_assets = len(terrain_types) * len(input_types)
         self.loading_progress.set_total(total_assets)
 
@@ -483,73 +477,84 @@ class GameManager:
             difficulty_score=self.difficulty_score
         )
         
-    def _adjust_multipliers_based_on_mood(self):
-        if self.player_profile: 
-            match self.player_profile["mood"]:
-                case "Chill":
-                    self.multipliers = map(lambda x: x * 0.8, self.multipliers)
-                case "Neutral":
-                    pass
-                case "Focused":
-                    self.multipliers = map(lambda x: x * 1.2, self.multipliers)
+        
     
-    def _update_difficulty_from_metrics(self, player: Character, state):
-        self._adjust_multipliers_based_on_mood()
+    def _update_difficulty_from_metrics(self, curr_score, state):
+        mood_multipliers = {
+            "Chill": 0.95,
+            "Neutral": 1.0,
+            "Focused": 1.05,
+        }
+
+        mood = self.player_profile.get("mood") if self.player_profile else None
+        multiplier = mood_multipliers.get(mood, 1.0) if mood else 1.0
 
         # -----------------------------
-        # NORMALIZED INPUTS (reuse LLM state)
+        # NORMALIZED PRESSURE INPUTS
+        # High values = player is struggling
         # -----------------------------
-        health = state["player_state"]["health_pressure"]
-        kill_rate = state["player_state"]["kill_pressure"]
-        shield = state["player_state"]["shield_pressure"]
+        health_pressure = state["player_state"]["health_pressure"]
+        kill_pressure = state["player_state"]["kill_pressure"]
+        shield_pressure = state["player_state"]["shield_pressure"]
 
-        density = state["environment_state"]["enemy_density"]
-        safety = state["environment_state"]["distance_pressure"]
-
-        close = state["environment_state"]["distance_state"]["close_score"]
+        enemy_density = state["environment_state"]["enemy_density"]
+        distance_pressure = state["environment_state"]["distance_pressure"]
+        close_score = state["environment_state"]["distance_state"]["close_score"]
 
         # -----------------------------
-        # INTERPRETATION (VERY IMPORTANT)
+        # STRUGGLE ESTIMATION
         # -----------------------------
-        # High values = player doing well → increase difficulty
-
-        player_skill = (
-            0.4 * kill_rate +
-            0.3 * health +
-            0.3 * shield
+        player_struggle = (
+            0.40 * health_pressure +
+            0.50 * kill_pressure +
+            0.10 * shield_pressure
         )
 
-        control_state = (
-            0.5 * safety +   # far = safe
-            0.5 * (1 - density)  # fewer enemies = safe
+        environment_pressure = (
+            0.70 * enemy_density +
+            0.30 * distance_pressure +
+            0.10 * close_score
         )
 
-        # behavioral signals (time-based)
-        positioning = (
-            0.6 * (1 - safety) +      # player escaping → too easy
-            0.4 * (1 - close)  # not under pressure
+        struggle = (
+            0.50 * player_struggle +
+            0.50 * environment_pressure
         )
 
         # -----------------------------
-        # FINAL METRIC SCORE
+        # DIFFICULTY TARGET
+        # High struggle -> lower difficulty
+        # Low struggle  -> higher difficulty
         # -----------------------------
-        score = (
-            0.5 * player_skill +
-            0.3 * control_state +
-            0.2 * positioning
-        )
+        target_score = 1.0 - struggle
 
-        # clamp to [0,1]
-        return max(0.0, min(1.0, score))
+        # -----------------------------
+        # TIME PROGRESS (inline)
+        # -----------------------------
+        if self.time_goal > 0:
+            time_progress = min(1.0, self.elapsed_time / self.time_goal) ** 2
+        else:
+            time_progress = 0.0
+
+        # -----------------------------
+        # COMBINE (90% performance, 10% time)
+        # -----------------------------
+        target_score = (
+            0.90 * target_score +
+            0.10 * time_progress
+        )
+        
+        target_score *= multiplier
+
+        # -----------------------------
+        # SMOOTHING
+        # Prevent abrupt jumps
+        # -----------------------------
+        smoothing = 0.10
+        new_score = curr_score + smoothing * (target_score - curr_score)
+
+        return max(0.0, min(1.0, new_score))
     
-    def _update_difficulty_from_time(self):
-        if self.time_goal <= 0:
-            return 0.0  # infinite mode
-
-        progress = min(1.0, self.elapsed_time / self.time_goal)
-
-        # nonlinear ramp (feels better than linear)
-        return progress ** 2
 
     def _apply_difficulty_to_enemy_speed(self):
         base_min, base_max = self.default_enemy_speed_range
@@ -601,13 +606,13 @@ class GameManager:
         # Kill rate (invert → struggling)
         # -----------------------------
         raw_kill_rate = self.kill_count / (self.elapsed_time + 1e-5)
-        kill_rate_norm = min(1.0, raw_kill_rate / 1.0)
+        kill_rate_norm = min(1.0, raw_kill_rate / 4.0)
         kill_pressure = 1.0 - kill_rate_norm
 
         # -----------------------------
         # Enemy density (more = harder)
         # -----------------------------
-        enemy_density = min(1.0, self.current_enemy_count / 40)
+        enemy_density = min(1.0, self.current_enemy_count / 20)
 
         # -----------------------------
         # Distance (closer = harder)
