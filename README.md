@@ -1,5 +1,5 @@
 # 🎮 Human-AI Co-Op: Adaptive Survival Game
-
+https://github.com/sefetekin23/Human-AI_Co-Op
 A custom infinite-survival game built with **Pygame**, implementing a **dual-layer adaptive framework**:
 
 - **Mechanical adaptation** → Dynamic Difficulty Adjustment (DDA)  
