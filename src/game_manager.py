@@ -1,6 +1,5 @@
 from enum import Enum, auto
 import time
-import json
 from typing import List
 from pathlib import Path
 from pygame.math import Vector2

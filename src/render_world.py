@@ -2,7 +2,6 @@ import random
 import os
 from collections import defaultdict
 
-import pygame
 from pygame.math import Vector2
 import math
 

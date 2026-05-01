@@ -1,158 +1,157 @@
-# 🎮 Adaptive Survival Game (Pygame)
+# 🎮 Human-AI Co-Op: Adaptive Survival Game
 
-An infinite survival game built with **Pygame**, designed around a **clear and explainable adaptive difficulty system**.
+A custom infinite-survival game built with **Pygame**, implementing a **dual-layer adaptive framework**:
 
-The player’s goal is simple: **survive as long as possible**.  
-The game dynamically adjusts enemy behaviour to remain fair, responsive, and stable as the player improves.
+- **Mechanical adaptation** → Dynamic Difficulty Adjustment (DDA)  
+- **Experiential adaptation** → Diffusion-generated visuals + LLM commentary  
 
-## 🧠 Core Principles
+The system personalises both **how the game plays** and **how it feels**, while ensuring these layers remain independent and stable.
 
-- Infinite survival (no win condition)
-- Adaptive difficulty based on player behaviour
-- Conservative, bounded adjustments
-- Clear separation between logic, rendering, UI, and persistence
-- Live debug HUD for tuning and validation
+---
+
+## 🧠 Key Idea
+
+Traditional games adapt difficulty only.
+
+This project goes further:
+
+- 🕹️ **DDA** → adapts challenge in real time  
+- 🎨 **Diffusion** → generates personalised visual environments  
+- 💬 **LLM** → provides context-aware commentary  
+
+👉 Crucially:  
+Generative components improve experience **without affecting gameplay performance**
+
+---
+
+## 🚀 Installation & Running
+
+### 1. Gameplay (Main System)
+
+Install:  
+```bash  
+pip install -r requirements.txt  
+```
+
+Run:  
+```bash  
+python src/main.py  
+```
+
+---
+
+### 2. Optional: Diffusion (Generative Content)
+
+Only needed if you want **background generation**.
+
+Install:  
+```bash  
+pip install -r diffusion_requirements.txt  
+pip install git+https://github.com/zengxianyu/structured-noise  
+```
+
+Setup:
+- Download model weights  
+- Place them in:  
+```  
+models/ppd/  
+```  
+
+(Optional example inputs are also in this folder)
+
+---
+
+## 🎮 How to Use Generative Features
+
+In the **player setup screen**:
+
+- Enable:
+  - Content Generation (top-left toggle)
+  - Optional LLM commentary
+- Provide:
+  - Player preferences (mood, object, etc.)
+
+This triggers:
+- Pre-game diffusion-based background generation  
+- In-game LLM commentary  
+
+---
+
+## ⚙️ System Overview
+
+### 1. Dynamic Difficulty Adjustment (DDA)
+- Updates once per second (not per frame)
+- Uses:
+  - health, kill rate, shield usage  
+  - enemy density, distance, pressure  
+- Produces a difficulty score in **[0,1]**
+- Derived empirically through iterative tuning
+
+---
+
+### 2. Generative Visual Adaptation
+- Uses phase-preserving diffusion  
+- Maintains spatial structure while changing style  
+- Runs before gameplay (no runtime lag)
+
+---
+
+### 3. LLM Commentary
+- Generates short, context-aware lines  
+- Conditioned on gameplay metrics and player preferences  
+- Does not affect gameplay mechanics  
+
+---
+
+## 📊 Key Result
+
+- DDA significantly improves survival time  
+- Generative features:
+  - do NOT change performance  
+  - DO improve perceived experience  
+
+This validates:  
+Mechanical and experiential adaptation can be combined **without interference**
+
+---
 
 ## 📁 Project Structure
 
-```text
-.
-├── main.py          # Game loop, input handling, system wiring
-├── config.py        # Tunable parameters (GameConfig)
-├── game_manager.py  # Core logic + adaptive difficulty
-├── character.py     # Player logic (movement, shields)
-├── enemy.py         # Enemy movement
-├── render_world.py  # World/entity rendering
-├── hud.py           # HUD, game over screen, debug panel
-├── scoreboard.py    # Persistent leaderboard (JSON)
-├── scores.json      # Local scores (gitignored)
-├── models/          # External assets/models (gitignored)
-└── README.md
-```
+```  
+src/  
+├── main.py  
+├── game_manager.py  
+├── character.py  
+├── enemy.py  
+├── assets/  
+├── logger.py  
+├── agentic_dda.py  
+```  
 
+```  
+models/  
+└── ppd/  
+```  
 
+---
 
-## 🎯 Game Flow
+## 🧪 Notes for Reproducibility
 
-1. Player starts in `PLAYING`
-2. Enemies spawn continuously
-3. Player survives and kills enemies with shields
-4. On death, the game enters `AWAITING_NAME`
-5. Player enters their name and score is saved
-6. Game enters `GAME_OVER`
-7. Player can restart
+- Core gameplay has minimal dependencies  
+- Generative pipeline is isolated  
+- Ensures easier setup and stable execution  
 
+---
 
-## ⚙️ Adaptive Difficulty Overview
+## ⚠️ Important
 
-Difficulty is controlled along two independent axes:
+- Diffusion requires GPU for best performance  
+- If not installed, the game still runs normally  
 
-- **Enemy density** (how many enemies exist)
-- **Enemy pressure** (how fast enemies approach)
+---
 
-All difficulty decisions are made **once per second**, never per frame.
+## 🧠 Summary
 
-> Frame ticks measure.  
-> Second ticks decide.
-
-## 📊 Metrics Used
-
-### Average Enemy Distance
-
-Computed once per second:
-avg_distance = mean(distance(enemy_i, player))
-
-Measures overall enemy pressure rather than player skill.
-
-### Enemy Count Delta
-
-Measured at each spawn event:
-enemy_count_delta = current_enemy_count - last_spawn_enemy_count
-
-
-Indicates whether the player is clearing enemies or being overwhelmed.
-
-### Kill Count
-
-Tracked for scoreboard context only.  
-Not used for difficulty decisions.
-
-
-## 🧠 Difficulty Axis 1 — Enemy Density (Spawning)
-
-Controlled by:
-- `spawn_count`
-- `spawn_interval`
-
-### Target Behaviour
-
-Over `spawn_interval` seconds, the ideal enemy change is:
-ideal_delta = -spawn_interval / 2
-
-
-Enemies should decrease slowly, but not disappear.
-
-### Adjustment Rules
-
-- If enemies decrease too quickly:
-  - increase `spawn_count`
-  - or decrease `spawn_interval`
-- If enemies increase too quickly:
-  - decrease `spawn_count`
-  - or increase `spawn_interval`
-
-### Bounds
-spawn_count ∈ [3, 10]
-spawn_interval ∈ [3s, 15s]
-
-Values slowly return to defaults when pressure stabilises.
-
-## 🧠 Difficulty Axis 2 — Enemy Pressure (Speed)
-
-Controlled by:
-- `enemy_min_speed`
-- `enemy_max_speed`
-
-### Rate-of-Change Rule
-
-Let:
-ΔD = avg_distance_now - avg_distance_previous
-
-- If `ΔD > shield_radius` → game got easier fast → increase speed
-- If `ΔD < -shield_radius` → game got harder fast → decrease speed
-
-### Absolute Distance Rule
-
-- If `avg_distance > enemy_max_spawn_dist` → increase speed
-- If `avg_distance < enemy_min_spawn_dist` → decrease speed
-
-Rate-of-change logic always takes priority.
-
-### Speed Bounds
-enemy_speed ∈ [30, 300]
-
-
-## 🧪 Debug HUD
-
-The debug panel displays live values for:
-
-- Spawn count
-- Spawn interval
-- Shield count
-- Average enemy distance
-- Enemy count delta (color-coded)
-- Enemy min and max speed
-
-Enemy count delta colors:
-- Green → enemies increasing (player struggling)
-- Red → enemies decreasing (player dominating)
-
-
-## 🏆 Scoreboard
-
-Each run records:
-- Player name
-- Survival time (ranking metric)
-- Kill count (context)
-
-The leaderboard is local, persistent, and sorted strictly by survival time.
+- DDA controls challenge  
+- Generative AI enhances experience  
+- Both coexist without breaking gameplay  

@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 import pkg_resources
 
 # Path to the requirements file
-requirements_path = os.path.join(os.path.dirname(__file__), "requirements.txt")
+requirements_path = os.path.join(os.path.dirname(__file__), "diffusion_requirements.txt")
 
 # Read the requirements from the requirements file
 if os.path.exists(requirements_path):

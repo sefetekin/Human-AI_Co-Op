@@ -2,8 +2,6 @@ from concurrent.futures import process
 from pathlib import Path
 import subprocess
 import sys
-import argparse
-from typing import Union
 
 """
 assets.py

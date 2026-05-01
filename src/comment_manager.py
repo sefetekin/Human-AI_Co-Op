@@ -1,9 +1,7 @@
-import os
 import time
 import threading
 import requests
-import subprocess
-import atexit
+
 from dotenv import load_dotenv
 load_dotenv()
 

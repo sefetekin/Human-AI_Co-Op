@@ -1,6 +1,5 @@
 import math
 import random
-import time
 import pygame
 from pygame.math import Vector2
 from typing import List

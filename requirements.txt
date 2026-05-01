@@ -1,15 +1,2 @@
-torch>=2.0.0
-torchvision
-transformers
-imageio
-imageio[ffmpeg]
-safetensors
-einops
-sentencepiece
-protobuf
-modelscope
-ftfy
-pynvml
-pandas
-accelerate
-peft
+pygame==2.5.2
+requests==2.33.1
