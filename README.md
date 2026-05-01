@@ -51,7 +51,7 @@ pip install git+https://github.com/zengxianyu/structured-noise
 ```
 
 Setup:
-- Download model weights  
+- Download model weight https://huggingface.co/zengxianyu/ppd/blob/main/sd1.5-epoch%3D10-step%3D720000.ckpt
 - Place them in:  
 ```  
 models/ppd/  
